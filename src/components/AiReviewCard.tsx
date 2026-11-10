@@ -1,7 +1,7 @@
 import type { CheckpointReview } from "@/lib/ai";
 
 const READY: Record<string, { tone: string; text: string }> = {
-  ready: { tone: "go", text: "Ready to move on" },
+  ready: { tone: "go", text: "Ready for the next step" },
   nearly: { tone: "wait", text: "Nearly there" },
   not_yet: { tone: "stop", text: "Not ready yet" },
 };
@@ -72,6 +72,11 @@ export default function AiReviewCard({ review, createdAt }: { review: Checkpoint
           </ul>
         </div>
       </div>
+      <p className="border-t border-[var(--line)] bg-[var(--paper)] p-5 text-sm">
+        This review checks your plan for gaps, contradictions and beliefs you haven&apos;t proven. It does not predict
+        whether the business will succeed. That depends on how the plan is carried out, on the market, and on things no
+        plan can foresee.
+      </p>
     </div>
   );
 }

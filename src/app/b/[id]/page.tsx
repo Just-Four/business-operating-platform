@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { SESSIONS } from "@/lib/programme";
+import { SESSIONS, sessionTitle } from "@/lib/programme";
 import { createClient } from "@/lib/supabase/server";
 import { MODELS, PARTS, STAGES, STATE_LABELS, type Stage } from "@/lib/framework";
 import { getProgress } from "@/lib/progress";
@@ -34,12 +34,14 @@ export default async function BusinessOverview({
   const { data: biz } = await supabase.from("businesses").select("name, stage, model, sector, planning_route").eq("id", id).single();
   if (biz && !biz.planning_route) redirect(`/b/${id}/start`);
   const stage = (biz?.stage ?? "launch") as Stage;
-  const guided = biz?.planning_route === "guided" || biz?.planning_route === "focused";
+  const guided = ["guided", "focused", "partial"].includes(biz?.planning_route ?? "");
   const { data: sessions } = guided
     ? await supabase.from("programme_sessions").select("key, completed_at, scheduled_on").eq("business_id", id)
     : { data: [] as { key: string; completed_at: string | null; scheduled_on: string | null }[] };
   const todayIso = new Date().toISOString().slice(0, 10);
-  const nextS = guided ? SESSIONS.find((s) => !(sessions ?? []).find((r) => r.key === s.key)?.completed_at) : undefined;
+  const progKeys = new Set((sessions ?? []).map((r) => r.key));
+  const progSessions = SESSIONS.filter((s) => progKeys.size === 0 || progKeys.has(s.key));
+  const nextS = guided ? progSessions.find((s) => !(sessions ?? []).find((r) => r.key === s.key)?.completed_at) : undefined;
   const behindCount = (sessions ?? []).filter((r) => !r.completed_at && r.scheduled_on && r.scheduled_on < todayIso && SESSIONS.find((s) => s.key === r.key)?.built).length;
   const progress = await getProgress(supabase, id);
   const stageIndex = ORDER.indexOf(stage);
@@ -56,10 +58,10 @@ export default async function BusinessOverview({
         <Link href={`/b/${id}/s/${nextS.key}`} className="card mb-8 flex items-center justify-between gap-4 border-[var(--ink)] p-5 hover:bg-[#f7f8fa]">
           <span>
             <span className="hint block">
-              Planning programme, session {nextS.seq} of {SESSIONS.length}
+              Planning programme, session {progSessions.indexOf(nextS) + 1} of {progSessions.length}
               {behindCount ? `, ${behindCount} behind schedule` : ""}
             </span>
-            <span className="display text-2xl font-bold">{nextS.title}</span>
+            <span className="display text-2xl font-bold">{sessionTitle(nextS.key, biz?.stage)}</span>
           </span>
           <span className="btn">Continue</span>
         </Link>

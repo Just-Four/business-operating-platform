@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { CANVAS_BOXES } from "@/lib/framework";
 import { guidanceFor } from "@/lib/guidance";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { SESSIONS, defaultDeadline, iso, nextSession, schedule, type Route } from "@/lib/programme";
+import { SESSIONS, defaultDeadline, iso, keysForRoute, scheduleForRoute, type Route } from "@/lib/programme";
 
 function str(formData: FormData, key: string) {
   const v = formData.get(key);
@@ -56,7 +56,9 @@ async function completeSessionInternal(supabase: SupabaseClient, businessId: str
       await supabase.from("programme_sessions").update({ scheduled_on: moved }).eq("business_id", businessId).eq("key", r.key);
     }
   }
-  const next = nextSession(key);
+  // Next session within this business's own programme (short programmes skip steps).
+  const inProgramme = new Set((rows ?? []).map((r) => r.key));
+  const next = SESSIONS.filter((x) => x.seq > seq && (inProgramme.size === 0 || inProgramme.has(x.key))).sort((a, b) => a.seq - b.seq)[0];
   return next ? `/b/${businessId}/s/${next.key}` : `/b/${businessId}/programme`;
 }
 
@@ -284,17 +286,40 @@ export async function startProgramme(formData: FormData) {
     .eq("id", businessId);
   if (error) redirect(`/b/${businessId}/start?error=${encodeURIComponent(error.message)}`);
 
-  if (route === "guided" || route === "focused") {
-    const dates = schedule(SESSIONS.map((s) => s.key), start, deadline);
-    await supabase.from("programme_sessions").upsert(
-      SESSIONS.map((s) => ({ business_id: businessId, key: s.key, seq: s.seq, scheduled_on: dates[s.key] })),
-      { onConflict: "business_id,key" }
-    );
+  if (route !== "board") {
+    await writeProgramme(supabase, businessId, route, need, start, deadline);
     revalidatePath(`/b/${businessId}`, "layout");
     redirect(`/b/${businessId}/programme`);
   }
   revalidatePath(`/b/${businessId}`, "layout");
   redirect(`/b/${businessId}`);
+}
+
+async function writeProgramme(
+  supabase: SupabaseClient,
+  businessId: string,
+  route: Route,
+  need: string | null,
+  start: Date,
+  deadline: Date
+) {
+  const keys = keysForRoute(route, need);
+  const { data: existing } = await supabase.from("programme_sessions").select("key, completed_at").eq("business_id", businessId);
+  const done = new Set((existing ?? []).filter((r) => r.completed_at).map((r) => r.key));
+  // Remove sessions that aren't part of this route. The work done in them is kept in its own tables.
+  const drop = (existing ?? []).filter((r) => !keys.includes(r.key)).map((r) => r.key);
+  if (drop.length) await supabase.from("programme_sessions").delete().eq("business_id", businessId).in("key", drop);
+  const open = keys.filter((k) => !done.has(k));
+  const dates = scheduleForRoute(route, open, start, deadline);
+  await supabase.from("programme_sessions").upsert(
+    keys.map((k) => ({
+      business_id: businessId,
+      key: k,
+      seq: SESSIONS.find((x) => x.key === k)?.seq ?? 0,
+      ...(done.has(k) ? {} : { scheduled_on: dates[k] }),
+    })),
+    { onConflict: "business_id,key" }
+  );
 }
 
 export async function saveSchedule(formData: FormData) {
@@ -303,6 +328,19 @@ export async function saveSchedule(formData: FormData) {
   for (const s of SESSIONS) {
     const d = str(formData, `date_${s.key}`);
     if (d) await supabase.from("programme_sessions").update({ scheduled_on: d }).eq("business_id", businessId).eq("key", s.key);
+  }
+  // Focused sittings: one date per sitting, applied to every session in it.
+  for (let g = 0; g < 10; g++) {
+    const d = str(formData, `group_${g}`);
+    const keys = formData.getAll(`group_${g}_key`).map(String);
+    if (d && keys.length) {
+      await supabase
+        .from("programme_sessions")
+        .update({ scheduled_on: d })
+        .eq("business_id", businessId)
+        .in("key", keys)
+        .is("completed_at", null);
+    }
   }
   const signOff = str(formData, "sign_off_date");
   if (signOff) await supabase.from("businesses").update({ sign_off_date: signOff }).eq("id", businessId);
@@ -348,20 +386,43 @@ export async function setRoute(formData: FormData) {
   const businessId = String(formData.get("business_id"));
   const route = String(formData.get("route")) as Route;
   const supabase = await createClient();
+  const { data: biz } = await supabase.from("businesses").select("current_need").eq("id", businessId).single();
   await supabase.from("businesses").update({ planning_route: route }).eq("id", businessId);
-  if (route === "guided" || route === "focused") {
-    const { data: existing } = await supabase.from("programme_sessions").select("key").eq("business_id", businessId);
-    if (!existing?.length) {
-      const start = new Date();
-      const dates = schedule(SESSIONS.map((s) => s.key), start, defaultDeadline(route, start));
-      await supabase.from("programme_sessions").upsert(
-        SESSIONS.map((s) => ({ business_id: businessId, key: s.key, seq: s.seq, scheduled_on: dates[s.key] })),
-        { onConflict: "business_id,key" }
-      );
-    }
+  if (route !== "board") {
+    const start = new Date();
+    const deadline = defaultDeadline(route, start);
+    await supabase.from("businesses").update({ plan_deadline: iso(deadline), sign_off_date: iso(deadline) }).eq("id", businessId);
+    await writeProgramme(supabase, businessId, route, biz?.current_need ?? null, start, deadline);
     revalidatePath(`/b/${businessId}`, "layout");
     redirect(`/b/${businessId}/programme`);
   }
   revalidatePath(`/b/${businessId}`, "layout");
   redirect(`/b/${businessId}`);
+}
+
+export async function saveLookback(formData: FormData) {
+  const businessId = String(formData.get("business_id"));
+  const supabase = await createClient();
+  const measures = formData.getAll("measure").map(String);
+  const items = measures.map((m, i) => ({
+    measure: m,
+    budget: str(formData, `budget_${i}`),
+    actual: str(formData, `actual_${i}`),
+    timing: str(formData, `timing_${i}`),
+    cause: str(formData, `cause_${i}`),
+  }));
+  const { error } = await supabase.from("lookbacks").upsert(
+    {
+      business_id: businessId,
+      period_label: str(formData, "period_label") ?? "Last year",
+      items,
+      furthest_wrong: str(formData, "furthest_wrong"),
+      lost_why: str(formData, "lost_why"),
+      least_profitable: str(formData, "least_profitable"),
+      no_payback: str(formData, "no_payback"),
+      biggest_lesson: str(formData, "biggest_lesson"),
+    },
+    { onConflict: "business_id,period_label" }
+  );
+  await done(formData, supabase, businessId, "", error?.message);
 }

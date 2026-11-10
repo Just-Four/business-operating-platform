@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { MODELS, PARTS, STAGES, STATE_LABELS, type Stage } from "@/lib/framework";
 import { getProgress } from "@/lib/progress";
-import { SESSIONS } from "@/lib/programme";
+import { SESSIONS, sessionTitle } from "@/lib/programme";
 import SideRoute, { type RouteStop } from "@/components/SideRoute";
 import { signOut } from "@/app/login/actions";
 
@@ -28,16 +28,17 @@ export default async function BusinessLayout({
   const stage = business.stage as Stage;
   const progress = await getProgress(supabase, id);
 
-  const guided = business.planning_route === "guided" || business.planning_route === "focused";
+  const guided = ["guided", "focused", "partial"].includes(business.planning_route ?? "");
   const { data: sessionRows } = guided
     ? await supabase.from("programme_sessions").select("key, completed_at, approved_at").eq("business_id", id)
     : { data: [] as { key: string; completed_at: string | null; approved_at: string | null }[] };
-  const sessionStops: RouteStop[] = SESSIONS.map((s) => {
+  const inProgramme = new Set((sessionRows ?? []).map((x) => x.key));
+  const sessionStops: RouteStop[] = SESSIONS.filter((s) => inProgramme.size === 0 || inProgramme.has(s.key)).map((s, i) => {
     const r = (sessionRows ?? []).find((x) => x.key === s.key);
     return {
-      num: s.seq,
+      num: i + 1,
       slug: `s/${s.key}`,
-      title: s.title,
+      title: sessionTitle(s.key, business.stage),
       state: !s.built ? "off" : r?.completed_at ? "complete" : "empty",
       note: !s.built ? "Next build" : s.checkpoint ? (r?.approved_at ? "Reviewed" : "Review checkpoint") : undefined,
       highlight: !!s.checkpoint,

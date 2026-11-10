@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { CANVAS_PLAIN, SESSIONS, TECH_TERM, sessionByKey } from "@/lib/programme";
+import { CANVAS_PLAIN, LOOKBACK_MEASURES, LOOKBACK_SESSION, SESSIONS, TECH_TERM, sessionByKey, sessionTitle } from "@/lib/programme";
 import { guidanceFor } from "@/lib/guidance";
 import { CANVAS_BOXES, gradeOf, type EvidenceStrength } from "@/lib/framework";
-import { addEvidence, deleteEvidence, recordReview, finishSession, saveCanvas, saveDiagnosis } from "../../actions";
+import { addEvidence, deleteEvidence, recordReview, finishSession, saveCanvas, saveDiagnosis, saveLookback } from "../../actions";
 import Notice from "@/components/Notice";
 import CanvasBoard from "@/components/CanvasBoard";
 
@@ -34,15 +34,15 @@ export default async function SessionPage({
 }) {
   const { id, key } = await params;
   const { error, saved } = await searchParams;
-  const session = sessionByKey(key);
-  if (!session) notFound();
+  const baseSession = sessionByKey(key);
+  if (!baseSession) notFound();
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
   const [{ data: biz }, { data: row }, { data: me }, { data: canvas }, { data: evidence }, { data: diag }] = await Promise.all([
-    supabase.from("businesses").select("name, model, stage").eq("id", id).single(),
+    supabase.from("businesses").select("name, model, stage, currency").eq("id", id).single(),
     supabase.from("programme_sessions").select("scheduled_on, completed_at, approved_at, review_type, reviewer_name, reviewer_role, review_notes").eq("business_id", id).eq("key", key).maybeSingle(),
     supabase.from("memberships").select("role").eq("business_id", id).eq("user_id", user?.id ?? "").maybeSingle(),
     supabase.from("canvas_boxes").select("box, answer").eq("business_id", id),
@@ -61,19 +61,31 @@ export default async function SessionPage({
       .maybeSingle(),
   ]);
 
+  const lookbackMode = key === "launch_path" && !!biz?.stage && biz.stage !== "launch";
+  const session = lookbackMode
+    ? { ...baseSession, title: LOOKBACK_SESSION.title, minutes: LOOKBACK_SESSION.minutes, why: LOOKBACK_SESSION.why, skipCost: LOOKBACK_SESSION.skipCost, output: LOOKBACK_SESSION.output, part: undefined }
+    : baseSession;
+  const { data: lookback } = lookbackMode
+    ? await supabase.from("lookbacks").select("*").eq("business_id", id).order("updated_at", { ascending: false }).limit(1).maybeSingle()
+    : { data: null };
+  const lbItems: { measure: string; budget: string | null; actual: string | null; timing: string | null; cause: string | null }[] =
+    lookback?.items ?? [];
   const guide = guidanceFor(biz?.model);
   const answers: Record<string, string> = {};
   for (const r of canvas ?? []) answers[r.box] = r.answer ?? "";
   const ev = evidence ?? [];
-  const prev = SESSIONS.find((s) => s.seq === session.seq - 1);
-  const next = SESSIONS.find((s) => s.seq === session.seq + 1);
+  const { data: progKeys } = await supabase.from("programme_sessions").select("key").eq("business_id", id);
+  const inProg = new Set((progKeys ?? []).map((r) => r.key));
+  const visible = SESSIONS.filter((s) => inProg.size === 0 || inProg.has(s.key));
+  const prev = [...visible].reverse().find((s) => s.seq < session.seq);
+  const next = visible.find((s) => s.seq > session.seq);
   const here = `/b/${id}/s/${key}`;
 
   return (
     <div className="max-w-3xl">
       <Notice error={error} saved={saved} />
       <p className="hint">
-        Session {session.seq} of {SESSIONS.length}, about {session.minutes} minutes
+        Session {visible.findIndex((s) => s.key === key) + 1} of {visible.length}, about {session.minutes} minutes
         {row?.scheduled_on ? `, planned for ${row.scheduled_on}` : ""}
         {row?.completed_at ? ", done" : ""}
       </p>
@@ -306,6 +318,82 @@ export default async function SessionPage({
           </div>
         )}
 
+
+        {lookbackMode && (
+          <form action={saveLookback} className="space-y-6">
+            <input type="hidden" name="business_id" value={id} />
+            <input type="hidden" name="session_key" value={key} />
+            <input type="hidden" name="return_to" value={here} />
+            <div className="card p-5">
+              <label htmlFor="period_label" className="label">Which period are you looking back on?</label>
+              <input id="period_label" name="period_label" className="input w-auto" defaultValue={lookback?.period_label ?? "Last year"} />
+            </div>
+            <div className="card overflow-x-auto p-5">
+              <h2 className="display text-xl font-bold">Where did the numbers land?</h2>
+              <p className="hint mt-1">
+                Fill in what you can. Leave a budget blank if you didn&apos;t set one; that&apos;s a lesson in itself.
+                ({biz?.currency ?? "GBP"} unless marked %)
+              </p>
+              <table className="mt-4 w-full min-w-[720px] text-sm">
+                <thead>
+                  <tr className="text-left">
+                    <th className="pb-2 font-semibold">Measure</th>
+                    <th className="pb-2 font-semibold">Budget</th>
+                    <th className="pb-2 font-semibold">Actual</th>
+                    <th className="pb-2 font-semibold">Timing or permanent?</th>
+                    <th className="pb-2 font-semibold">Why</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {LOOKBACK_MEASURES.map((m, i) => {
+                    const it = lbItems.find((x) => x.measure === m);
+                    return (
+                      <tr key={m} className="border-t border-[var(--line)]">
+                        <td className="py-2 pr-3 font-medium">
+                          <input type="hidden" name="measure" value={m} />
+                          {m}
+                        </td>
+                        <td className="py-2 pr-2"><input name={`budget_${i}`} inputMode="decimal" className="input py-1" defaultValue={it?.budget ?? ""} aria-label={`${m} budget`} /></td>
+                        <td className="py-2 pr-2"><input name={`actual_${i}`} inputMode="decimal" className="input py-1" defaultValue={it?.actual ?? ""} aria-label={`${m} actual`} /></td>
+                        <td className="py-2 pr-2">
+                          <select name={`timing_${i}`} className="input min-w-[8.5rem] py-1" defaultValue={it?.timing ?? ""} aria-label={`${m} timing or permanent`}>
+                            <option value="">—</option>
+                            <option value="timing">Timing</option>
+                            <option value="permanent">Permanent</option>
+                          </select>
+                        </td>
+                        <td className="py-2"><input name={`cause_${i}`} className="input py-1" defaultValue={it?.cause ?? ""} aria-label={`${m} cause`} /></td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+              <p className="hint mt-3">
+                Timing means it will catch up (a delayed contract). Permanent means it won&apos;t (a lost customer).
+              </p>
+            </div>
+            {[
+              ["furthest_wrong", "Which assumption was furthest wrong: volume, price, timing or cost?", lookback?.furthest_wrong],
+              ["lost_why", "Why did you lose the customers or deals you lost?", lookback?.lost_why],
+              ["least_profitable", "Which product, customer or site made the least money, and why?", lookback?.least_profitable],
+              ["no_payback", "What did you spend that didn't pay back?", lookback?.no_payback],
+            ].map(([name, q, val]) => (
+              <div key={name as string} className="card p-5">
+                <label htmlFor={name as string} className="display block text-lg font-bold">{q}</label>
+                <textarea id={name as string} name={name as string} rows={2} className="input mt-3" defaultValue={(val as string) ?? ""} />
+              </div>
+            ))}
+            <div className="card border-[var(--wait)] p-5">
+              <label htmlFor="biggest_lesson" className="display block text-xl font-bold">The biggest lesson, in one sentence</label>
+              <p className="hint mt-1">It becomes a rule when you build next year&apos;s numbers.</p>
+              <textarea id="biggest_lesson" name="biggest_lesson" rows={2} className="input mt-3" defaultValue={lookback?.biggest_lesson ?? ""} />
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button className="btn btn-secondary">Save and carry on later</button>
+              <button className="btn" name="finish" value="1">Save and finish session</button>
+            </div>
+          </form>
+        )}
         {session.part && key !== "diagnosis" && (
           <div className="card p-5">
             <p>
@@ -323,8 +411,8 @@ export default async function SessionPage({
       </div>
 
       <nav className="mt-12 flex justify-between border-t border-[var(--line)] pt-4 text-sm" aria-label="Sessions">
-        {prev ? <Link href={`/b/${id}/s/${prev.key}`} className="hover:underline">Previous: {prev.title}</Link> : <span />}
-        {next ? <Link href={`/b/${id}/s/${next.key}`} className="hover:underline">Next: {next.title}</Link> : <span />}
+        {prev ? <Link href={`/b/${id}/s/${prev.key}`} className="hover:underline">Previous: {sessionTitle(prev.key, biz?.stage)}</Link> : <span />}
+        {next ? <Link href={`/b/${id}/s/${next.key}`} className="hover:underline">Next: {sessionTitle(next.key, biz?.stage)}</Link> : <span />}
       </nav>
     </div>
   );

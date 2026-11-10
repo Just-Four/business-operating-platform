@@ -147,7 +147,7 @@ export function schedule(keys: string[], start: Date, deadline: Date): Record<st
 }
 
 export function defaultDeadline(route: Route, from: Date) {
-  return addDays(from, route === "focused" ? 7 : 16);
+  return addDays(from, route === "focused" ? 9 : route === "partial" ? 9 : 16);
 }
 
 export const CANVAS_PLAIN: Record<string, { question: string; help: string }> = {
@@ -173,3 +173,59 @@ export const TECH_TERM: Record<string, string> = {
   revenue_streams: "Revenue streams",
   cost_structure: "Cost structure",
 };
+
+// Session 8 for businesses that are already trading: a look back instead of a launch path.
+export const LOOKBACK_SESSION = {
+  title: "What last year taught you",
+  minutes: 50,
+  why: "Last year's misses become next year's assumptions. Looking honestly at where the numbers landed, and why, stops you planning the same mistakes again with more confidence.",
+  skipCost: "Plans that skip this repeat last year's optimism. The same assumption that was wrong last time quietly goes back into the budget.",
+  output: "Budget against actual for the key measures, the reasons for each gap, and the single biggest lesson.",
+};
+
+export function sessionTitle(key: string, stage?: string | null) {
+  if (key === "launch_path" && stage && stage !== "launch") return LOOKBACK_SESSION.title;
+  return sessionByKey(key)?.title ?? key;
+}
+
+export const LOOKBACK_MEASURES = [
+  "Revenue",
+  "Gross margin (%)",
+  "Overheads",
+  "EBITDA or net profit",
+  "Closing cash",
+  "Customers or units at year end",
+  "New customers or sales won",
+  "Utilisation or occupancy (%)",
+];
+
+// Focused route: the same steps grouped into six sittings.
+export const FOCUSED_GROUPS: { title: string; keys: string[] }[] = [
+  { title: "Set up and commit", keys: ["commit"] },
+  { title: "Your business model", keys: ["who_pays", "deliver_money", "evidence"] },
+  { title: "Diagnosis and challenge", keys: ["diagnosis", "checkpoint_1"] },
+  { title: "Direction and the path ahead", keys: ["direction", "launch_path"] },
+  { title: "The year ahead", keys: ["battles", "numbers", "quarter", "roles"] },
+  { title: "Sign-off", keys: ["sign_off", "lock"] },
+];
+
+// Short programmes for users who only need part of the plan.
+export const PARTIAL_KEYS: Record<string, string[]> = {
+  quarter: ["commit", "diagnosis", "checkpoint_1", "quarter", "roles"],
+  refresh: ["commit", "who_pays", "deliver_money", "evidence", "diagnosis", "checkpoint_1", "direction"],
+};
+
+export function keysForRoute(route: Route, need?: string | null): string[] {
+  if (route === "partial") return PARTIAL_KEYS[need ?? "refresh"] ?? PARTIAL_KEYS.refresh;
+  return SESSIONS.map((s) => s.key);
+}
+
+// Dates for a route: focused shares one date per sitting; others get one date per session.
+export function scheduleForRoute(route: Route, keys: string[], start: Date, deadline: Date): Record<string, string> {
+  if (route !== "focused") return schedule(keys, start, deadline);
+  const groups = FOCUSED_GROUPS.map((g) => ({ ...g, keys: g.keys.filter((k) => keys.includes(k)) })).filter((g) => g.keys.length);
+  const groupDates = schedule(groups.map((g) => g.title), start, deadline);
+  const out: Record<string, string> = {};
+  for (const g of groups) for (const k of g.keys) out[k] = groupDates[g.title];
+  return out;
+}

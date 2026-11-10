@@ -19,5 +19,5 @@ export async function createBusiness(formData: FormData) {
   });
   if (error) redirect(`/?error=${encodeURIComponent(error.message)}`);
   revalidatePath("/");
-  redirect(`/b/${id}`);
+  redirect(`/b/${id}/start`);
 }

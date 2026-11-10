@@ -5,6 +5,8 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { CANVAS_BOXES } from "@/lib/framework";
 import { guidanceFor } from "@/lib/guidance";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { SESSIONS, defaultDeadline, iso, nextSession, schedule, type Route } from "@/lib/programme";
 
 function str(formData: FormData, key: string) {
   const v = formData.get(key);
@@ -19,10 +21,53 @@ function num(formData: FormData, key: string) {
   return Number.isFinite(n) ? n : null;
 }
 
-function done(businessId: string, page: string, error?: string) {
+async function completeSessionInternal(supabase: SupabaseClient, businessId: string, key: string) {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const today = iso(new Date());
+  const { data: rows } = await supabase
+    .from("programme_sessions")
+    .select("key, seq, scheduled_on, completed_at")
+    .eq("business_id", businessId);
+  const row = (rows ?? []).find((r) => r.key === key);
+  const seq = SESSIONS.find((x) => x.key === key)?.seq ?? 0;
+  await supabase.from("programme_sessions").upsert(
+    {
+      business_id: businessId,
+      key,
+      seq,
+      completed_at: row?.completed_at ?? new Date().toISOString(),
+      completed_by: user?.id ?? null,
+    },
+    { onConflict: "business_id,key" }
+  );
+  // Ahead of schedule: pull the remaining sessions forward by the days gained.
+  if (row?.scheduled_on && row.scheduled_on > today) {
+    const gained = Math.round((new Date(row.scheduled_on).getTime() - new Date(today).getTime()) / 86_400_000);
+    for (const r of rows ?? []) {
+      if (r.completed_at || r.key === key || !r.scheduled_on || r.seq <= seq) continue;
+      const d = new Date(r.scheduled_on);
+      d.setDate(d.getDate() - gained);
+      while ((d.getDay() === 0 || d.getDay() === 6) && iso(d) > today) d.setDate(d.getDate() - 1);
+      const moved = iso(d) < today ? today : iso(d);
+      await supabase.from("programme_sessions").update({ scheduled_on: moved }).eq("business_id", businessId).eq("key", r.key);
+    }
+  }
+  const next = nextSession(key);
+  return next ? `/b/${businessId}/s/${next.key}` : `/b/${businessId}/programme`;
+}
+
+async function done(formData: FormData, supabase: SupabaseClient, businessId: string, page: string, error?: string) {
   revalidatePath(`/b/${businessId}`, "layout");
-  const base = `/b/${businessId}${page ? `/${page}` : ""}`;
-  redirect(error ? `${base}?error=${encodeURIComponent(error)}` : `${base}?saved=1`);
+  const sessionKey = str(formData, "session_key");
+  if (!error && sessionKey && formData.get("finish") === "1") {
+    redirect(await completeSessionInternal(supabase, businessId, sessionKey));
+  }
+  const returnTo = str(formData, "return_to");
+  const base = returnTo && returnTo.startsWith(`/b/${businessId}`) ? returnTo : `/b/${businessId}${page ? `/${page}` : ""}`;
+  const sep = base.includes("?") ? "&" : "?";
+  redirect(error ? `${base}${sep}error=${encodeURIComponent(error)}` : `${base}${sep}saved=1`);
 }
 
 export async function updateStage(formData: FormData) {
@@ -34,21 +79,21 @@ export async function updateStage(formData: FormData) {
   const sector = formData.get("sector");
   if (sector !== null) update.sector = String(sector).trim();
   const { error } = await supabase.from("businesses").update(update).eq("id", businessId);
-  done(businessId, "", error?.message);
+  await done(formData, supabase, businessId, "", error?.message);
 }
 
 export async function saveCanvas(formData: FormData) {
   const businessId = String(formData.get("business_id"));
   const supabase = await createClient();
   const today = new Date().toISOString().slice(0, 10);
-  const rows = CANVAS_BOXES.map((box) => ({
+  const rows = CANVAS_BOXES.filter((box) => formData.has(`${box.key}_answer`)).map((box) => ({
     business_id: businessId,
     box: box.key,
     answer: str(formData, `${box.key}_answer`),
     checked_on: today,
   }));
   const { error } = await supabase.from("canvas_boxes").upsert(rows, { onConflict: "business_id,box" });
-  done(businessId, "canvas", error?.message);
+  await done(formData, supabase, businessId, "canvas", error?.message);
 }
 
 export async function saveDiagnosis(formData: FormData) {
@@ -70,7 +115,7 @@ export async function saveDiagnosis(formData: FormData) {
   const { error } = id
     ? await supabase.from("diagnoses").update(row).eq("id", id)
     : await supabase.from("diagnoses").insert(row);
-  done(businessId, "diagnosis", error?.message);
+  await done(formData, supabase, businessId, "diagnosis", error?.message);
 }
 
 export async function saveDirection(formData: FormData) {
@@ -94,7 +139,7 @@ export async function saveDirection(formData: FormData) {
     },
     { onConflict: "business_id" }
   );
-  done(businessId, "direction", error?.message);
+  await done(formData, supabase, businessId, "direction", error?.message);
 }
 
 export async function addAssumption(formData: FormData) {
@@ -112,7 +157,7 @@ export async function addAssumption(formData: FormData) {
     test: str(formData, "test"),
     checkpoint_date: str(formData, "checkpoint_date"),
   });
-  done(businessId, "launch", error?.message);
+  await done(formData, supabase, businessId, "launch", error?.message);
 }
 
 export async function updateAssumption(formData: FormData) {
@@ -122,7 +167,7 @@ export async function updateAssumption(formData: FormData) {
     .from("assumptions")
     .update({ status: str(formData, "status"), result: str(formData, "result") })
     .eq("id", String(formData.get("id")));
-  done(businessId, "launch", error?.message);
+  await done(formData, supabase, businessId, "launch", error?.message);
 }
 
 export async function addMilestone(formData: FormData) {
@@ -140,7 +185,7 @@ export async function addMilestone(formData: FormData) {
     spend_limit: num(formData, "spend_limit"),
     due_date: str(formData, "due_date"),
   });
-  done(businessId, "launch", error?.message);
+  await done(formData, supabase, businessId, "launch", error?.message);
 }
 
 export async function loadStandardMilestones(formData: FormData) {
@@ -155,7 +200,7 @@ export async function loadStandardMilestones(formData: FormData) {
       description: m.description,
     }))
   );
-  done(businessId, "launch", error?.message);
+  await done(formData, supabase, businessId, "launch", error?.message);
 }
 
 export async function updateMilestone(formData: FormData) {
@@ -171,7 +216,7 @@ export async function updateMilestone(formData: FormData) {
       met_on: status === "met" ? new Date().toISOString().slice(0, 10) : null,
     })
     .eq("id", String(formData.get("id")));
-  done(businessId, "launch", error?.message);
+  await done(formData, supabase, businessId, "launch", error?.message);
 }
 
 export async function addEvidence(formData: FormData) {
@@ -201,4 +246,121 @@ export async function deleteEvidence(formData: FormData) {
   const { error } = await supabase.from("evidence").delete().eq("id", String(formData.get("id")));
   revalidatePath(`/b/${businessId}`, "layout");
   return { error: error?.message ?? null };
+}
+
+function routeFor(experience: string, need: string): Route {
+  if (need === "quarter" || need === "refresh") return "partial";
+  if (experience === "regular") return "board";
+  if (experience === "some") return "focused";
+  return "guided";
+}
+
+export async function startProgramme(formData: FormData) {
+  const businessId = String(formData.get("business_id"));
+  const supabase = await createClient();
+  const experience = String(formData.get("experience") ?? "never");
+  const need = String(formData.get("need") ?? "full_year");
+  const sale = String(formData.get("sale") ?? "none");
+  const model = String(formData.get("pay") ?? "other");
+  const route = (str(formData, "route") as Route | null) ?? routeFor(experience, need);
+  const stage = sale === "steady" ? "established" : sale === "few" ? "early_revenue" : "launch";
+  const start = new Date();
+  const deadlineStr = str(formData, "deadline");
+  const deadline = deadlineStr ? new Date(deadlineStr) : defaultDeadline(route, start);
+
+  const { error } = await supabase
+    .from("businesses")
+    .update({
+      experience,
+      current_need: need,
+      stage,
+      model,
+      planning_route: route,
+      plan_deadline: iso(deadline),
+      sign_off_date: iso(deadline),
+    })
+    .eq("id", businessId);
+  if (error) redirect(`/b/${businessId}/start?error=${encodeURIComponent(error.message)}`);
+
+  if (route === "guided" || route === "focused") {
+    const dates = schedule(SESSIONS.map((s) => s.key), start, deadline);
+    await supabase.from("programme_sessions").upsert(
+      SESSIONS.map((s) => ({ business_id: businessId, key: s.key, seq: s.seq, scheduled_on: dates[s.key] })),
+      { onConflict: "business_id,key" }
+    );
+    revalidatePath(`/b/${businessId}`, "layout");
+    redirect(`/b/${businessId}/programme`);
+  }
+  revalidatePath(`/b/${businessId}`, "layout");
+  redirect(`/b/${businessId}`);
+}
+
+export async function saveSchedule(formData: FormData) {
+  const businessId = String(formData.get("business_id"));
+  const supabase = await createClient();
+  for (const s of SESSIONS) {
+    const d = str(formData, `date_${s.key}`);
+    if (d) await supabase.from("programme_sessions").update({ scheduled_on: d }).eq("business_id", businessId).eq("key", s.key);
+  }
+  const signOff = str(formData, "sign_off_date");
+  if (signOff) await supabase.from("businesses").update({ sign_off_date: signOff }).eq("id", businessId);
+  if (formData.get("commit") === "1") {
+    redirect(await completeSessionInternal(supabase, businessId, "commit"));
+  }
+  revalidatePath(`/b/${businessId}`, "layout");
+  redirect(`/b/${businessId}/programme?saved=1`);
+}
+
+export async function finishSession(formData: FormData) {
+  const businessId = String(formData.get("business_id"));
+  const supabase = await createClient();
+  revalidatePath(`/b/${businessId}`, "layout");
+  redirect(await completeSessionInternal(supabase, businessId, String(formData.get("session_key"))));
+}
+
+export async function approveCheckpoint(formData: FormData) {
+  const businessId = String(formData.get("business_id"));
+  const key = String(formData.get("session_key"));
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const { data: me } = await supabase
+    .from("memberships")
+    .select("role")
+    .eq("business_id", businessId)
+    .eq("user_id", user?.id ?? "")
+    .maybeSingle();
+  if (me?.role !== "chairman") {
+    redirect(`/b/${businessId}/s/${key}?error=${encodeURIComponent("Only the chairman can approve a checkpoint.")}`);
+  }
+  await supabase
+    .from("programme_sessions")
+    .update({ approved_at: new Date().toISOString(), approved_by: user?.id ?? null })
+    .eq("business_id", businessId)
+    .eq("key", key);
+  revalidatePath(`/b/${businessId}`, "layout");
+  redirect(await completeSessionInternal(supabase, businessId, key));
+}
+
+export async function setRoute(formData: FormData) {
+  const businessId = String(formData.get("business_id"));
+  const route = String(formData.get("route")) as Route;
+  const supabase = await createClient();
+  await supabase.from("businesses").update({ planning_route: route }).eq("id", businessId);
+  if (route === "guided" || route === "focused") {
+    const { data: existing } = await supabase.from("programme_sessions").select("key").eq("business_id", businessId);
+    if (!existing?.length) {
+      const start = new Date();
+      const dates = schedule(SESSIONS.map((s) => s.key), start, defaultDeadline(route, start));
+      await supabase.from("programme_sessions").upsert(
+        SESSIONS.map((s) => ({ business_id: businessId, key: s.key, seq: s.seq, scheduled_on: dates[s.key] })),
+        { onConflict: "business_id,key" }
+      );
+    }
+    revalidatePath(`/b/${businessId}`, "layout");
+    redirect(`/b/${businessId}/programme`);
+  }
+  revalidatePath(`/b/${businessId}`, "layout");
+  redirect(`/b/${businessId}`);
 }

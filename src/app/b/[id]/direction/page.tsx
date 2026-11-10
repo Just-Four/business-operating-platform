@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { saveDirection } from "../actions";
 import Notice from "@/components/Notice";
@@ -8,10 +9,10 @@ export default async function DirectionPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ error?: string; saved?: string }>;
+  searchParams: Promise<{ error?: string; saved?: string; session?: string }>;
 }) {
   const { id } = await params;
-  const { error, saved } = await searchParams;
+  const { error, saved, session } = await searchParams;
   const supabase = await createClient();
   const [{ data }, { data: biz }] = await Promise.all([
     supabase.from("direction").select("*").eq("business_id", id).maybeSingle(),
@@ -23,6 +24,12 @@ export default async function DirectionPage({
   return (
     <div className="max-w-3xl">
       <Notice error={error} saved={saved} />
+      {session && (
+        <p className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded border border-[var(--wait)] bg-[var(--wait-tint)] p-3 text-sm">
+          <span>You&apos;re working through this as part of your planning programme.</span>
+          <Link href={`/b/${id}/s/${session}`} className="font-semibold underline underline-offset-4">Back to the session</Link>
+        </p>
+      )}
       <p className="hint">Part 3</p>
       <h1 className="text-4xl font-bold leading-none sm:text-5xl">Direction</h1>
       <p className="mt-3 text-[var(--muted)]">
@@ -32,6 +39,7 @@ export default async function DirectionPage({
 
       <form action={saveDirection} className="mt-6 space-y-4">
         <input type="hidden" name="business_id" value={id} />
+          {session && <input type="hidden" name="return_to" value={`/b/${id}/direction?session=${session}`} />}
         <div className="card p-4">
           <label className="label" htmlFor="purpose">Purpose</label>
           <p className="hint mb-2">Why the business exists, in one line.</p>

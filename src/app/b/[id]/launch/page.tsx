@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { ASSUMPTION_STATUSES, MILESTONE_STATUSES, label } from "@/lib/framework";
 import {
@@ -24,10 +25,10 @@ export default async function LaunchPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ error?: string; saved?: string }>;
+  searchParams: Promise<{ error?: string; saved?: string; session?: string }>;
 }) {
   const { id } = await params;
-  const { error, saved } = await searchParams;
+  const { error, saved, session } = await searchParams;
   const supabase = await createClient();
   const [{ data: assumptions }, { data: milestones }, { data: biz }] = await Promise.all([
     supabase.from("assumptions").select("*").eq("business_id", id).order("rank"),
@@ -40,6 +41,12 @@ export default async function LaunchPage({
   return (
     <div>
       <Notice error={error} saved={saved} />
+      {session && (
+        <p className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded border border-[var(--wait)] bg-[var(--wait-tint)] p-3 text-sm">
+          <span>You&apos;re working through this as part of your planning programme.</span>
+          <Link href={`/b/${id}/s/${session}`} className="font-semibold underline underline-offset-4">Back to the session</Link>
+        </p>
+      )}
       <p className="hint">Part 4</p>
       <h1 className="text-4xl font-bold leading-none sm:text-5xl">Launch plan</h1>
       <p className="mt-3 text-[var(--muted)] max-w-3xl">
@@ -53,6 +60,7 @@ export default async function LaunchPage({
           {(assumptions ?? []).map((a) => (
             <form key={a.id} action={updateAssumption} className={`card p-4 ${statusColour[a.status] ?? ""}`}>
               <input type="hidden" name="business_id" value={id} />
+          {session && <input type="hidden" name="return_to" value={`/b/${id}/launch?session=${session}`} />}
               <input type="hidden" name="id" value={a.id} />
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">
@@ -80,6 +88,7 @@ export default async function LaunchPage({
 
         <form action={addAssumption} className="card mt-4 grid gap-3 p-4 sm:grid-cols-2">
           <input type="hidden" name="business_id" value={id} />
+          {session && <input type="hidden" name="return_to" value={`/b/${id}/launch?session=${session}`} />}
           <div className="sm:col-span-2">
             <label className="label" htmlFor="assumption">New assumption</label>
             <input className="input" id="assumption" name="assumption" required placeholder={guide.assumption} />
@@ -108,6 +117,7 @@ export default async function LaunchPage({
           {(milestones ?? []).length === 0 && (
             <form action={loadStandardMilestones}>
               <input type="hidden" name="business_id" value={id} />
+          {session && <input type="hidden" name="return_to" value={`/b/${id}/launch?session=${session}`} />}
               <button className="btn btn-secondary">Load the standard milestones for this type of business</button>
             </form>
           )}
@@ -117,6 +127,7 @@ export default async function LaunchPage({
           {(milestones ?? []).map((m) => (
             <form key={m.id} action={updateMilestone} className={`card p-4 ${statusColour[m.status] ?? ""}`}>
               <input type="hidden" name="business_id" value={id} />
+          {session && <input type="hidden" name="return_to" value={`/b/${id}/launch?session=${session}`} />}
               <input type="hidden" name="id" value={m.id} />
               <div className="flex flex-wrap items-end gap-3">
                 <div className="min-w-[220px] flex-1">
@@ -148,6 +159,7 @@ export default async function LaunchPage({
 
         <form action={addMilestone} className="card mt-4 grid gap-3 p-4 sm:grid-cols-4">
           <input type="hidden" name="business_id" value={id} />
+          {session && <input type="hidden" name="return_to" value={`/b/${id}/launch?session=${session}`} />}
           <div className="sm:col-span-2">
             <label className="label" htmlFor="m_name">New milestone</label>
             <input className="input" id="m_name" name="name" required />

@@ -20,7 +20,7 @@ export default async function BusinessLayout({
   } = await supabase.auth.getUser();
   const { data: business } = await supabase
     .from("businesses")
-    .select("id, name, model, sector, stage, country")
+    .select("id, name, model, sector, stage, country, planning_route")
     .eq("id", id)
     .maybeSingle();
   if (!business) notFound();
@@ -54,6 +54,11 @@ export default async function BusinessLayout({
               {STAGES[stage]}
             </span>
           </Link>
+          {(business.planning_route === "guided" || business.planning_route === "focused") && (
+            <Link href={`/b/${id}/programme`} className="mt-6 block rounded border border-white/25 px-3 py-2 text-sm hover:bg-white/10">
+              Planning programme
+            </Link>
+          )}
           <nav className="mt-8 flex-1">
             <SideRoute businessId={id} stops={stops} />
           </nav>

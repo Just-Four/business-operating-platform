@@ -40,6 +40,7 @@ export default function CanvasBoard({
   initial,
   evidence,
   examples,
+  returnTo,
   action,
   addEvidence,
   deleteEvidence,
@@ -48,6 +49,7 @@ export default function CanvasBoard({
   initial: Record<string, string>;
   evidence: EvidenceItem[];
   examples: Record<string, string>;
+  returnTo?: string;
   action: (formData: FormData) => void | Promise<void>;
   addEvidence: EvAction;
   deleteEvidence: EvAction;
@@ -85,6 +87,7 @@ export default function CanvasBoard({
     <>
       <form action={action} onSubmit={() => setDirty(false)}>
         <input type="hidden" name="business_id" value={businessId} />
+        {returnTo && <input type="hidden" name="return_to" value={returnTo} />}
 
         <div className="mb-4 flex flex-wrap items-center gap-2 text-sm" aria-live="polite">
           <span className="tag" data-tone="go">{counts.proven} proven</span>

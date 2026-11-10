@@ -4,7 +4,12 @@ import { createClient } from "@/lib/supabase/server";
 import { CANVAS_PLAIN, LOOKBACK_MEASURES, LOOKBACK_SESSION, SESSIONS, TECH_TERM, sessionByKey, sessionTitle } from "@/lib/programme";
 import { guidanceFor } from "@/lib/guidance";
 import { CANVAS_BOXES, gradeOf, type EvidenceStrength } from "@/lib/framework";
-import { addEvidence, deleteEvidence, recordReview, finishSession, saveCanvas, saveDiagnosis, saveLookback } from "../../actions";
+import { addEvidence, deleteEvidence, recordReview, finishSession, saveCanvas, saveDiagnosis, saveLookback, runAiReview, acceptAiReview } from "../../actions";
+import AiReviewCard from "@/components/AiReviewCard";
+import PendingButton from "@/components/PendingButton";
+import type { CheckpointReview } from "@/lib/ai";
+
+export const maxDuration = 60;
 import Notice from "@/components/Notice";
 import CanvasBoard from "@/components/CanvasBoard";
 
@@ -41,6 +46,9 @@ export default async function SessionPage({
     data: { user },
   } = await supabase.auth.getUser();
 
+  const { data: aiReview } = key === "checkpoint_1"
+    ? await supabase.from("ai_reviews").select("content, created_at").eq("business_id", id).eq("kind", "checkpoint").order("created_at", { ascending: false }).limit(1).maybeSingle()
+    : { data: null };
   const [{ data: biz }, { data: row }, { data: me }, { data: canvas }, { data: evidence }, { data: diag }] = await Promise.all([
     supabase.from("businesses").select("name, model, stage, currency").eq("id", id).single(),
     supabase.from("programme_sessions").select("scheduled_on, completed_at, approved_at, review_type, reviewer_name, reviewer_role, review_notes").eq("business_id", id).eq("key", key).maybeSingle(),
@@ -264,7 +272,21 @@ export default async function SessionPage({
                 </p>
                 {row.review_notes && <p className="mt-2 whitespace-pre-line text-sm text-[var(--muted)]">{row.review_notes}</p>}
               </div>
-            ) : (
+            ) : null}
+            {row?.approved_at ? (
+              <form id="ai-review" action={runAiReview} className="card flex flex-wrap items-center justify-between gap-3 p-5">
+                <input type="hidden" name="business_id" value={id} />
+                <input type="hidden" name="session_key" value={key} />
+                <p className="text-sm">
+                  {aiReview ? "Changed the plan since? Get a fresh challenge." : "Get the AI's challenge as well. It takes about half a minute."}
+                </p>
+                <PendingButton label={aiReview ? "Run the AI review again" : "Run the AI review"} pending="Reviewing your plan…" className="btn btn-secondary" />
+              </form>
+            ) : null}
+            {row?.approved_at && aiReview ? (
+              <AiReviewCard review={aiReview.content as CheckpointReview} createdAt={aiReview.created_at} />
+            ) : null}
+            {row?.approved_at ? null : (
               <div className="space-y-4">
                 <h2 className="text-2xl font-bold">How do you want it challenged?</h2>
                 <form action={recordReview} className="card space-y-4 p-5">
@@ -301,13 +323,37 @@ export default async function SessionPage({
                   <button className="btn">Record the review and carry on</button>
                 </form>
 
-                <div className="card p-5 opacity-70">
-                  <h3 className="display text-xl font-bold">Have the AI review it</h3>
-                  <p className="hint mt-1">
-                    The AI will read your answers and challenge them: vague answers, boxes that contradict each other,
-                    numbers that don&apos;t add up, and the riskiest things you haven&apos;t proven. Coming with the AI coach.
-                  </p>
+                <div id="ai-review" className="card space-y-4 p-5">
+                  <div>
+                    <h3 className="display text-xl font-bold">Have the AI review it</h3>
+                    <p className="hint mt-1">
+                      The AI reads everything you&apos;ve written and challenges it: vague answers, parts that contradict each
+                      other, numbers that don&apos;t add up, and the riskiest things you haven&apos;t proven. For each challenge
+                      it suggests the smallest test you could run this week. It takes about half a minute.
+                    </p>
+                  </div>
+                  <form action={runAiReview}>
+                    <input type="hidden" name="business_id" value={id} />
+                    <input type="hidden" name="session_key" value={key} />
+                    <PendingButton
+                      label={aiReview ? "Run the AI review again" : "Run the AI review"}
+                      pending="Reviewing your plan…"
+                      className={aiReview ? "btn btn-secondary" : "btn"}
+                    />
+                  </form>
                 </div>
+                {aiReview && (
+                  <>
+                    <AiReviewCard review={aiReview.content as CheckpointReview} createdAt={aiReview.created_at} />
+                    <form action={acceptAiReview} className="card space-y-3 p-5">
+                      <input type="hidden" name="business_id" value={id} />
+                      <input type="hidden" name="session_key" value={key} />
+                      <label className="label" htmlFor="ai_notes">What will you change or test because of this?</label>
+                      <textarea id="ai_notes" name="review_notes" required rows={3} className="input" />
+                      <button className="btn">Mark the checkpoint reviewed and carry on</button>
+                    </form>
+                  </>
+                )}
 
                 <div className="flex flex-wrap items-center gap-3">
                   <FinishForm id={id} sessionKey={key} label="Carry on and review later" quiet />

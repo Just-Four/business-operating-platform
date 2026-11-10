@@ -1,6 +1,7 @@
 "use server";
 
 import { randomUUID, randomBytes, createHash } from "crypto";
+import { buildPlanText, runCheckpointReview } from "@/lib/ai";
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -590,4 +591,57 @@ export async function revokeAgentKey(formData: FormData) {
   await supabase.from("agent_keys").update({ revoked_at: new Date().toISOString() }).eq("id", String(formData.get("id")));
   revalidatePath(`/b/${businessId}`, "layout");
   redirect(`/b/${businessId}/tasks#agents`);
+}
+
+// ---------- AI review ----------
+
+export async function runAiReview(formData: FormData) {
+  const businessId = String(formData.get("business_id"));
+  const key = String(formData.get("session_key"));
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  let message: string | null = null;
+  try {
+    const plan = await buildPlanText(supabase, businessId);
+    const r = await runCheckpointReview(plan);
+    const { error } = await supabase.from("ai_reviews").insert({
+      business_id: businessId,
+      kind: "checkpoint",
+      session_key: key,
+      content: r.content,
+      model: r.model,
+      input_tokens: r.input_tokens,
+      output_tokens: r.output_tokens,
+      created_by: user?.id ?? null,
+    });
+    if (error) message = error.message;
+  } catch (e) {
+    message = e instanceof Error ? e.message : "The AI review didn't complete. Try again.";
+  }
+  revalidatePath(`/b/${businessId}`, "layout");
+  redirect(`/b/${businessId}/s/${key}${message ? `?error=${encodeURIComponent(message)}` : "#ai-review"}`);
+}
+
+export async function acceptAiReview(formData: FormData) {
+  const businessId = String(formData.get("business_id"));
+  const key = String(formData.get("session_key"));
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const { error } = await supabase
+    .from("programme_sessions")
+    .update({
+      approved_at: new Date().toISOString(),
+      approved_by: user?.id ?? null,
+      review_type: "ai",
+      review_notes: str(formData, "review_notes"),
+    })
+    .eq("business_id", businessId)
+    .eq("key", key);
+  if (error) redirect(`/b/${businessId}/s/${key}?error=${encodeURIComponent(error.message)}`);
+  revalidatePath(`/b/${businessId}`, "layout");
+  redirect(await completeSessionInternal(supabase, businessId, key));
 }

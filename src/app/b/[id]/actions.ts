@@ -42,7 +42,6 @@ export async function saveCanvas(formData: FormData) {
     business_id: businessId,
     box: box.key,
     answer: str(formData, `${box.key}_answer`),
-    evidence: str(formData, `${box.key}_evidence`),
     checked_on: today,
   }));
   const { error } = await supabase.from("canvas_boxes").upsert(rows, { onConflict: "business_id,box" });
@@ -169,4 +168,33 @@ export async function updateMilestone(formData: FormData) {
     })
     .eq("id", String(formData.get("id")));
   done(businessId, "launch", error?.message);
+}
+
+export async function addEvidence(formData: FormData) {
+  const businessId = String(formData.get("business_id"));
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const { error } = await supabase.from("evidence").insert({
+    business_id: businessId,
+    subject_type: String(formData.get("subject_type") ?? "canvas"),
+    subject_key: String(formData.get("subject_key")),
+    kind: String(formData.get("kind")),
+    summary: str(formData, "summary") ?? "",
+    source: str(formData, "source"),
+    evidence_date: str(formData, "evidence_date") ?? new Date().toISOString().slice(0, 10),
+    link: str(formData, "link"),
+    created_by: user?.id ?? null,
+  });
+  revalidatePath(`/b/${businessId}`, "layout");
+  return { error: error?.message ?? null };
+}
+
+export async function deleteEvidence(formData: FormData) {
+  const businessId = String(formData.get("business_id"));
+  const supabase = await createClient();
+  const { error } = await supabase.from("evidence").delete().eq("id", String(formData.get("id")));
+  revalidatePath(`/b/${businessId}`, "layout");
+  return { error: error?.message ?? null };
 }

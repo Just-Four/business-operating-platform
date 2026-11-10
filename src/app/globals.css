@@ -200,9 +200,12 @@ h3,
   background: repeating-linear-gradient(-45deg, #fff, #fff 9px, #f5f7f9 9px, #f5f7f9 10px);
 }
 .tile[data-state="assumption"] {
+  border-top-color: var(--stop);
+}
+.tile[data-state="supported"] {
   border-top-color: var(--wait);
 }
-.tile[data-state="evidence"] {
+.tile[data-state="proven"] {
   border-top-color: var(--go);
 }
 .tile-area {
@@ -227,12 +230,18 @@ h3,
   color: #9aa2b0;
 }
 .tile-evidence-row {
+  width: 100%;
+  color: var(--ink);
   display: flex;
   align-items: baseline;
   gap: 8px;
   border-top: 1px dashed var(--line);
   padding-top: 6px;
   margin-top: 6px;
+}
+.tile-evidence-row:hover .tile-evidence-label {
+  color: var(--ink);
+  text-decoration: underline;
 }
 .tile-evidence-label {
   flex: none;

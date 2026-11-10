@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { saveCanvas } from "../actions";
+import { addEvidence, deleteEvidence, saveCanvas } from "../actions";
 import Notice from "@/components/Notice";
 import CanvasBoard from "@/components/CanvasBoard";
 
@@ -13,9 +13,17 @@ export default async function CanvasPage({
   const { id } = await params;
   const { error, saved } = await searchParams;
   const supabase = await createClient();
-  const { data } = await supabase.from("canvas_boxes").select("box, answer, evidence").eq("business_id", id);
-  const initial: Record<string, { answer: string; evidence: string }> = {};
-  for (const r of data ?? []) initial[r.box] = { answer: r.answer ?? "", evidence: r.evidence ?? "" };
+  const [{ data }, { data: evidence }] = await Promise.all([
+    supabase.from("canvas_boxes").select("box, answer").eq("business_id", id),
+    supabase
+      .from("evidence")
+      .select("id, subject_key, kind, strength, summary, source, evidence_date, link")
+      .eq("business_id", id)
+      .eq("subject_type", "canvas")
+      .order("evidence_date", { ascending: false }),
+  ]);
+  const initial: Record<string, string> = {};
+  for (const r of data ?? []) initial[r.box] = r.answer ?? "";
 
   return (
     <div>
@@ -24,11 +32,19 @@ export default async function CanvasPage({
       <h1 className="text-4xl font-bold leading-none sm:text-5xl">Business model</h1>
       <p className="mt-3 max-w-2xl text-[var(--muted)]">
         What the business is and how it makes money, on one board. Start on the right with customers, work left to what
-        it takes to serve them, then fill in the money along the bottom.
+        it takes to serve them, then fill in the money along the bottom. Back each box with evidence; anything left
+        unproven becomes an assumption to test in the launch plan.
       </p>
 
       <div className="mt-8">
-        <CanvasBoard businessId={id} initial={initial} action={saveCanvas} />
+        <CanvasBoard
+          businessId={id}
+          initial={initial}
+          evidence={evidence ?? []}
+          action={saveCanvas}
+          addEvidence={addEvidence}
+          deleteEvidence={deleteEvidence}
+        />
       </div>
     </div>
   );

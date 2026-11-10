@@ -141,3 +141,39 @@ export const MILESTONE_STATUSES = ["not_started", "in_progress", "met", "missed"
 export function label(value: string) {
   return value.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase());
 }
+
+export type EvidenceStrength = "strong" | "medium" | "weak";
+
+export const EVIDENCE_KINDS: { key: string; label: string; strength: EvidenceStrength; example: string }[] = [
+  { key: "signed_contract", label: "Signed contract", strength: "strong", example: "Lease, client contract, framework agreement" },
+  { key: "booking_or_payment", label: "Booking or payment", strength: "strong", example: "Purchase order, deposit paid, confirmed booking" },
+  { key: "own_trading_data", label: "Our own trading data", strength: "strong", example: "Occupancy, invoices, accounts from our own records" },
+  { key: "written_commitment", label: "Written commitment", strength: "medium", example: "Letter of intent, email confirming they want to proceed" },
+  { key: "supplier_quote", label: "Written quote", strength: "medium", example: "Landlord offer, furniture or cleaning quote" },
+  { key: "independent_data", label: "Independent data", strength: "medium", example: "Market report, public statistics, project pipeline" },
+  { key: "conversation", label: "Conversation", strength: "weak", example: "Call or meeting with no written follow-up" },
+  { key: "past_experience", label: "Past experience", strength: "weak", example: "What happened in a previous business or market" },
+];
+
+export const STRENGTH_LABEL: Record<EvidenceStrength, string> = {
+  strong: "Strong",
+  medium: "Medium",
+  weak: "Weak",
+};
+
+export const STALE_DAYS: Record<EvidenceStrength, number> = { strong: 365, medium: 90, weak: 90 };
+
+export function isStale(strength: EvidenceStrength, date: string) {
+  const age = (Date.now() - new Date(date).getTime()) / 86_400_000;
+  return age > STALE_DAYS[strength];
+}
+
+export type Grade = "empty" | "assumption" | "supported" | "proven";
+
+export function gradeOf(hasAnswer: boolean, items: { strength: EvidenceStrength; evidence_date: string }[]): Grade {
+  if (!hasAnswer) return "empty";
+  const fresh = items.filter((i) => !isStale(i.strength, i.evidence_date));
+  if (fresh.some((i) => i.strength === "strong")) return "proven";
+  if (fresh.some((i) => i.strength === "medium")) return "supported";
+  return "assumption";
+}

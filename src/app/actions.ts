@@ -11,7 +11,8 @@ export async function createBusiness(formData: FormData) {
   const { error } = await supabase.from("businesses").insert({
     id,
     name: String(formData.get("name") ?? "").trim(),
-    model: String(formData.get("model") ?? "workforce_accommodation"),
+    model: String(formData.get("model") ?? "other"),
+    sector: String(formData.get("sector") ?? "").trim() || null,
     stage: String(formData.get("stage") ?? "launch"),
     country: String(formData.get("country") ?? "").trim() || null,
     currency: String(formData.get("currency") ?? "GBP"),

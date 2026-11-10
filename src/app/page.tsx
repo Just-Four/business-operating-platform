@@ -17,7 +17,7 @@ export default async function PortfolioPage({
 
   const { data: businesses } = await supabase
     .from("businesses")
-    .select("id, name, model, stage, country, currency, memberships(role, user_id)")
+    .select("id, name, model, sector, stage, country, currency, memberships(role, user_id)")
     .order("name");
 
   const ids = (businesses ?? []).map((b) => b.id);
@@ -50,8 +50,7 @@ export default async function PortfolioPage({
                   {myRole && <span className="rounded bg-[#e7f1fb] px-2 py-0.5 text-xs capitalize">{myRole}</span>}
                 </div>
                 <p className="hint mt-1">
-                  {MODELS[b.model] ?? b.model} · {STAGES[b.stage as Stage]}
-                  {b.country ? ` · ${b.country}` : ""}
+                  {[b.sector || MODELS[b.model], STAGES[b.stage as Stage], b.country].filter(Boolean).join(", ")}
                 </p>
                 <dl className="mt-4 grid grid-cols-2 gap-2 text-sm">
                   <div>
@@ -80,8 +79,12 @@ export default async function PortfolioPage({
               <input className="input" id="name" name="name" required />
             </div>
             <div>
-              <label className="label" htmlFor="model">Business model</label>
-              <select className="input" id="model" name="model" defaultValue="workforce_accommodation">
+              <label className="label" htmlFor="sector">Sector</label>
+              <input className="input" id="sector" name="sector" placeholder="e.g. Childcare, IT support, Accommodation" />
+            </div>
+            <div>
+              <label className="label" htmlFor="model">How it makes money</label>
+              <select className="input" id="model" name="model" defaultValue="other">
                 {Object.entries(MODELS).map(([k, v]) => (
                   <option key={k} value={k}>{v}</option>
                 ))}

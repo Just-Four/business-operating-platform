@@ -31,6 +31,8 @@ export async function updateStage(formData: FormData) {
   const update: Record<string, string> = { stage: String(formData.get("stage")) };
   const model = formData.get("model");
   if (model) update.model = String(model);
+  const sector = formData.get("sector");
+  if (sector !== null) update.sector = String(sector).trim();
   const { error } = await supabase.from("businesses").update(update).eq("id", businessId);
   done(businessId, "", error?.message);
 }

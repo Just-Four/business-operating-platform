@@ -29,7 +29,7 @@ export default async function BusinessOverview({
   const { id } = await params;
   const { error, saved } = await searchParams;
   const supabase = await createClient();
-  const { data: biz } = await supabase.from("businesses").select("name, stage, model").eq("id", id).single();
+  const { data: biz } = await supabase.from("businesses").select("name, stage, model, sector").eq("id", id).single();
   const stage = (biz?.stage ?? "launch") as Stage;
   const progress = await getProgress(supabase, id);
   const stageIndex = ORDER.indexOf(stage);
@@ -67,8 +67,12 @@ export default async function BusinessOverview({
 
         <form action={updateStage} className="mt-3 flex flex-wrap items-center gap-2">
           <input type="hidden" name="business_id" value={id} />
-          <label htmlFor="model" className="hint">
-            Type of business
+          <label htmlFor="sector" className="hint">
+            Sector
+          </label>
+          <input className="input w-48 py-1.5" id="sector" name="sector" defaultValue={biz?.sector ?? ""} />
+          <label htmlFor="model" className="hint ml-2">
+            How it makes money
           </label>
           <select className="input w-auto py-1.5" id="model" name="model" defaultValue={biz?.model ?? "other"}>
             {Object.entries(MODELS).map(([k, v]) => (

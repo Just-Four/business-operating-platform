@@ -20,7 +20,7 @@ export default async function BusinessLayout({
   } = await supabase.auth.getUser();
   const { data: business } = await supabase
     .from("businesses")
-    .select("id, name, model, stage, country")
+    .select("id, name, model, sector, stage, country")
     .eq("id", id)
     .maybeSingle();
   if (!business) notFound();
@@ -48,8 +48,7 @@ export default async function BusinessLayout({
           <Link href={`/b/${id}`} className="mt-4 block">
             <span className="display block text-2xl font-bold leading-tight">{business.name}</span>
             <span className="mt-1 block text-sm text-white/70">
-              {MODELS[business.model] ?? business.model}
-              {business.country ? `, ${business.country}` : ""}
+              {[business.sector || MODELS[business.model], business.country].filter(Boolean).join(", ")}
             </span>
             <span className="tag mt-3" data-tone="wait">
               {STAGES[stage]}

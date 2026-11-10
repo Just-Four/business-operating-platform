@@ -8,12 +8,13 @@ export const STAGES: Record<Stage, string> = {
 };
 
 export const MODELS: Record<string, string> = {
-  workforce_accommodation: "Workforce accommodation",
-  booking_platform: "Booking platform",
-  hospitality: "B&B, hotel or short lets",
-  training_events: "Training, courses or events",
-  professional_services: "Professional services",
-  retail_ecommerce: "Retail or e-commerce",
+  recurring_contract: "Contracts or retainers",
+  capacity: "Capacity: places, rooms, seats or beds",
+  project_pipeline: "Projects won from a pipeline",
+  transactional: "Sales to customers: shop, online, food",
+  subscription: "Subscriptions: software or memberships",
+  marketplace: "Marketplace or platform",
+  courses_events: "Courses or events",
   other: "Other",
 };
 
@@ -144,7 +145,7 @@ export const EVIDENCE_KINDS: { key: string; label: string; strength: EvidenceStr
   { key: "booking_or_payment", label: "Booking or payment", strength: "strong", example: "Purchase order, deposit paid, confirmed booking" },
   { key: "own_trading_data", label: "Our own trading data", strength: "strong", example: "Sales, invoices, usage or accounts from our own records" },
   { key: "written_commitment", label: "Written commitment", strength: "medium", example: "Letter of intent, email confirming they want to proceed" },
-  { key: "supplier_quote", label: "Written quote", strength: "medium", example: "Supplier price, landlord offer, quoted terms" },
+  { key: "supplier_quote", label: "Written quote", strength: "medium", example: "Supplier price, quoted terms, written offer" },
   { key: "independent_data", label: "Independent data", strength: "medium", example: "Market report, public statistics, industry data" },
   { key: "conversation", label: "Conversation", strength: "weak", example: "Call or meeting with no written follow-up" },
   { key: "past_experience", label: "Past experience", strength: "weak", example: "What happened in a previous business or market" },

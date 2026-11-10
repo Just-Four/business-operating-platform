@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { MODELS, PARTS, STAGES, STATE_LABELS, type Stage } from "@/lib/framework";
 import { getProgress } from "@/lib/progress";
+import { SESSIONS } from "@/lib/programme";
 import SideRoute, { type RouteStop } from "@/components/SideRoute";
 import { signOut } from "@/app/login/actions";
 
@@ -26,6 +27,22 @@ export default async function BusinessLayout({
   if (!business) notFound();
   const stage = business.stage as Stage;
   const progress = await getProgress(supabase, id);
+
+  const guided = business.planning_route === "guided" || business.planning_route === "focused";
+  const { data: sessionRows } = guided
+    ? await supabase.from("programme_sessions").select("key, completed_at, approved_at").eq("business_id", id)
+    : { data: [] as { key: string; completed_at: string | null; approved_at: string | null }[] };
+  const sessionStops: RouteStop[] = SESSIONS.map((s) => {
+    const r = (sessionRows ?? []).find((x) => x.key === s.key);
+    return {
+      num: s.seq,
+      slug: `s/${s.key}`,
+      title: s.title,
+      state: !s.built ? "off" : r?.completed_at ? "complete" : "empty",
+      note: !s.built ? "Next build" : s.checkpoint ? (r?.approved_at ? "Reviewed" : "Review checkpoint") : undefined,
+      highlight: !!s.checkpoint,
+    };
+  });
 
   const stops: RouteStop[] = PARTS.map((p) => {
     const s = p.stages[stage];
@@ -54,13 +71,21 @@ export default async function BusinessLayout({
               {STAGES[stage]}
             </span>
           </Link>
-          {(business.planning_route === "guided" || business.planning_route === "focused") && (
+          {guided && (
             <Link href={`/b/${id}/programme`} className="mt-6 block rounded border border-white/25 px-3 py-2 text-sm hover:bg-white/10">
-              Planning programme
+              Planning programme and dates
             </Link>
           )}
-          <nav className="mt-8 flex-1">
-            <SideRoute businessId={id} stops={stops} />
+          <nav className="mt-6 flex-1" aria-label={guided ? "Programme sessions" : "Plan parts"}>
+            <SideRoute businessId={id} stops={guided ? sessionStops : stops} />
+            {guided && (
+              <details className="mt-6 text-sm text-white/80">
+                <summary className="cursor-pointer hover:text-white">View the plan by part</summary>
+                <div className="mt-3">
+                  <SideRoute businessId={id} stops={stops} />
+                </div>
+              </details>
+            )}
           </nav>
           <div className="mt-8 border-t border-white/15 pt-4 text-sm">
             <p className="truncate text-white/60">{user?.email}</p>

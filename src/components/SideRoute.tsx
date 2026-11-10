@@ -9,12 +9,13 @@ export type RouteStop = {
   title: string;
   state: "complete" | "partial" | "empty" | "off";
   note?: string;
+  highlight?: boolean;
 };
 
 export default function SideRoute({ businessId, stops }: { businessId: string; stops: RouteStop[] }) {
   const pathname = usePathname();
   return (
-    <ol className="route" aria-label="Framework parts">
+    <ol className="route">
       {stops.map((s) => {
         const href = `/b/${businessId}/${s.slug}`;
         const current = pathname === href;
@@ -22,7 +23,7 @@ export default function SideRoute({ businessId, stops }: { businessId: string; s
           <li key={s.slug}>
             <Link
               href={href}
-              className="stop"
+              className={`stop ${s.highlight ? "stop-highlight" : ""}`}
               aria-current={current ? "page" : undefined}
               data-off={s.state === "off" ? "true" : undefined}
             >
@@ -30,7 +31,7 @@ export default function SideRoute({ businessId, stops }: { businessId: string; s
                 {s.state === "complete" ? "✓" : s.num}
               </span>
               <span className="min-w-0 flex-1">
-                <span className="stop-label">{s.title}</span>
+                <span className={`stop-label ${s.highlight ? "font-semibold" : ""}`}>{s.title}</span>
                 {s.note && <span className="block text-[12px] leading-tight text-white/55">{s.note}</span>}
               </span>
               <span className="sr-only">

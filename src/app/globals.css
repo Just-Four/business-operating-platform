@@ -165,6 +165,12 @@ h3,
   border-style: dashed;
   opacity: 0.45;
 }
+.stop-highlight .dot {
+  border-color: var(--wait);
+}
+.stop-highlight .stop-label {
+  color: #f4c46a;
+}
 .stop[data-off="true"] {
   opacity: 0.55;
 }

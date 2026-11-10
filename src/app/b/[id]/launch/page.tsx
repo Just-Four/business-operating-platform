@@ -38,14 +38,15 @@ export default async function LaunchPage({
   return (
     <div>
       <Notice error={error} saved={saved} />
-      <h2 className="text-2xl font-semibold">Part 4 – Launch plan</h2>
-      <p className="hint mt-1 max-w-3xl">
+      <p className="hint">Part 4</p>
+      <h1 className="text-4xl font-bold leading-none sm:text-5xl">Launch plan</h1>
+      <p className="mt-3 text-[var(--muted)] max-w-3xl">
         A new business plans against assumptions, not history. Test the riskiest first, and release more money only
         when a milestone is met. When milestone 6 is met, switch the stage to Early revenue.
       </p>
 
       <section className="mt-8">
-        <h3 className="text-lg font-semibold">Assumptions, riskiest first</h3>
+        <h2 className="text-2xl font-bold">Assumptions, riskiest first</h2>
         <div className="mt-3 space-y-3">
           {(assumptions ?? []).map((a) => (
             <form key={a.id} action={updateAssumption} className={`card p-4 ${statusColour[a.status] ?? ""}`}>
@@ -101,7 +102,7 @@ export default async function LaunchPage({
 
       <section className="mt-10">
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold">Milestones to first revenue</h3>
+          <h2 className="text-2xl font-bold">Milestones to first revenue</h2>
           {(milestones ?? []).length === 0 && (
             <form action={loadStandardMilestones}>
               <input type="hidden" name="business_id" value={id} />

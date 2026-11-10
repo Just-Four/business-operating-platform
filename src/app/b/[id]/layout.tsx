@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import TopBar from "@/components/TopBar";
 import { MODELS, PARTS, STAGES, STATE_LABELS, type Stage } from "@/lib/framework";
+import { getProgress } from "@/lib/progress";
+import SideRoute, { type RouteStop } from "@/components/SideRoute";
+import { signOut } from "@/app/login/actions";
 
 export default async function BusinessLayout({
   children,
@@ -23,41 +25,50 @@ export default async function BusinessLayout({
     .maybeSingle();
   if (!business) notFound();
   const stage = business.stage as Stage;
+  const progress = await getProgress(supabase, id);
+
+  const stops: RouteStop[] = PARTS.map((p) => {
+    const s = p.stages[stage];
+    return {
+      num: p.num,
+      slug: p.slug,
+      title: p.title,
+      state: s === "off" ? "off" : (progress.states[p.slug] ?? "empty"),
+      note: s === "on" ? (p.built ? undefined : "Next build") : STATE_LABELS[s],
+    };
+  });
 
   return (
-    <>
-      <TopBar email={user?.email} />
-      <div className="mx-auto flex max-w-7xl gap-8 px-6 py-8">
-        <aside className="w-64 shrink-0">
-          <Link href="/" className="hint hover:underline">← Portfolio</Link>
-          <Link href={`/b/${id}`} className="mt-3 block">
-            <h1 className="text-lg font-semibold leading-tight">{business.name}</h1>
-            <p className="hint">
-              {MODELS[business.model] ?? business.model} · {STAGES[stage]}
-            </p>
+    <div className="min-h-screen lg:flex">
+      <aside className="bg-[var(--ink)] text-white lg:sticky lg:top-0 lg:h-screen lg:w-72 lg:shrink-0 lg:overflow-y-auto">
+        <div className="flex h-full flex-col px-5 py-6">
+          <Link href="/" className="text-sm text-white/70 hover:text-white">
+            All businesses
           </Link>
-          <nav className="mt-6 space-y-1">
-            {PARTS.map((p) => {
-              const state = p.stages[stage];
-              const off = state === "off";
-              return (
-                <Link
-                  key={p.slug}
-                  href={`/b/${id}/${p.slug}`}
-                  className={`flex items-center justify-between rounded px-2 py-1.5 text-sm hover:bg-white ${off ? "text-[#a3a29c]" : ""}`}
-                >
-                  <span>
-                    <span className="mr-2 inline-block w-5 text-right text-[#8a8983]">{p.num}</span>
-                    {p.title}
-                  </span>
-                  {state !== "on" && <span className="text-[11px] text-[#8a8983]">{STATE_LABELS[state]}</span>}
-                </Link>
-              );
-            })}
+          <Link href={`/b/${id}`} className="mt-4 block">
+            <span className="display block text-2xl font-bold leading-tight">{business.name}</span>
+            <span className="mt-1 block text-sm text-white/70">
+              {MODELS[business.model] ?? business.model}
+              {business.country ? `, ${business.country}` : ""}
+            </span>
+            <span className="tag mt-3" data-tone="wait">
+              {STAGES[stage]}
+            </span>
+          </Link>
+          <nav className="mt-8 flex-1">
+            <SideRoute businessId={id} stops={stops} />
           </nav>
-        </aside>
-        <main className="min-w-0 flex-1">{children}</main>
-      </div>
-    </>
+          <div className="mt-8 border-t border-white/15 pt-4 text-sm">
+            <p className="truncate text-white/60">{user?.email}</p>
+            <form action={signOut}>
+              <button className="mt-1 text-white/85 underline-offset-4 hover:underline">Sign out</button>
+            </form>
+          </div>
+        </div>
+      </aside>
+      <main className="min-w-0 flex-1 px-6 py-8 lg:px-10 lg:py-10">
+        <div className="mx-auto max-w-6xl">{children}</div>
+      </main>
+    </div>
   );
 }

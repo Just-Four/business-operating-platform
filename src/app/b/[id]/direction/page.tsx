@@ -21,8 +21,9 @@ export default async function DirectionPage({
   return (
     <div className="max-w-3xl">
       <Notice error={error} saved={saved} />
-      <h2 className="text-2xl font-semibold">Part 3 – Direction</h2>
-      <p className="hint mt-1">
+      <p className="hint">Part 3</p>
+      <h1 className="text-4xl font-bold leading-none sm:text-5xl">Direction</h1>
+      <p className="mt-3 text-[var(--muted)]">
         Where the business is going over three horizons.
         {biz?.stage === "launch" ? " At launch stage, purpose and the 3–5 year targets are enough." : ""}
       </p>

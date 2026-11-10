@@ -1,8 +1,23 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { PARTS, STAGES, STATE_LABELS, type Stage } from "@/lib/framework";
+import { getProgress } from "@/lib/progress";
 import { updateStage } from "./actions";
 import Notice from "@/components/Notice";
+
+const ORDER: Stage[] = ["launch", "early_revenue", "established"];
+
+const GROUPS = [
+  { title: "Plan", text: "What the business is, where it's going, and this year's and this quarter's targets.", parts: [1, 2, 3, 4, 5, 6] },
+  { title: "Run", text: "Who does the work, how it's measured, and how it's routed.", parts: [7, 8] },
+  { title: "Review", text: "The rhythm that checks the plan, and the chairman's monthly review.", parts: [9, 10] },
+];
+
+const STATE_TAG: Record<string, { tone: string; text: string }> = {
+  complete: { tone: "go", text: "Complete" },
+  partial: { tone: "wait", text: "Started" },
+  empty: { tone: "quiet", text: "Not started" },
+};
 
 export default async function BusinessOverview({
   params,
@@ -14,74 +29,102 @@ export default async function BusinessOverview({
   const { id } = await params;
   const { error, saved } = await searchParams;
   const supabase = await createClient();
+  const { data: biz } = await supabase.from("businesses").select("name, stage").eq("id", id).single();
+  const stage = (biz?.stage ?? "launch") as Stage;
+  const progress = await getProgress(supabase, id);
+  const stageIndex = ORDER.indexOf(stage);
 
-  const [biz, canvas, diag, dir, assumptions, milestones] = await Promise.all([
-    supabase.from("businesses").select("stage").eq("id", id).single(),
-    supabase.from("canvas_boxes").select("answer").eq("business_id", id),
-    supabase.from("diagnoses").select("diagnosis").eq("business_id", id).eq("is_current", true).maybeSingle(),
-    supabase.from("direction").select("purpose, mid_term_year").eq("business_id", id).maybeSingle(),
-    supabase.from("assumptions").select("status").eq("business_id", id),
-    supabase.from("milestones").select("status").eq("business_id", id),
-  ]);
-
-  const stage = (biz.data?.stage ?? "launch") as Stage;
-  const filled = (canvas.data ?? []).filter((c) => c.answer && String(c.answer).trim()).length;
-  const proven = (assumptions.data ?? []).filter((a) => a.status === "proven").length;
-  const met = (milestones.data ?? []).filter((m) => m.status === "met").length;
-
-  const progress: Record<string, string> = {
-    canvas: `${filled} of 9 boxes filled`,
-    diagnosis: diag.data?.diagnosis ? "Written" : "Not written",
-    direction: dir.data?.purpose ? `Set${dir.data.mid_term_year ? ` to ${dir.data.mid_term_year}` : ""}` : "Not set",
-    launch: `${(assumptions.data ?? []).length} assumptions (${proven} proven) · ${met}/${(milestones.data ?? []).length} milestones met`,
-  };
+  const builtOn = PARTS.filter((p) => p.built && p.stages[stage] !== "off");
+  const done = builtOn.filter((p) => progress.states[p.slug] === "complete").length;
+  const next = builtOn.find((p) => progress.states[p.slug] !== "complete");
 
   return (
     <div>
       <Notice error={error} saved={saved} />
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-semibold">Overview</h2>
-          <p className="hint">Which parts of the framework are switched on depends on the stage.</p>
-        </div>
-        <form action={updateStage} className="flex items-end gap-2">
-          <input type="hidden" name="business_id" value={id} />
-          <div>
-            <label className="label" htmlFor="stage">Stage</label>
-            <select className="input" id="stage" name="stage" defaultValue={stage}>
-              {Object.entries(STAGES).map(([k, v]) => (
-                <option key={k} value={k}>{v}</option>
-              ))}
-            </select>
-          </div>
-          <button className="btn btn-secondary">Change stage</button>
-        </form>
-      </div>
 
-      <div className="mt-6 grid gap-3 md:grid-cols-2">
-        {PARTS.map((p) => {
-          const state = p.stages[stage];
-          return (
-            <Link
-              key={p.slug}
-              href={`/b/${id}/${p.slug}`}
-              className={`card block p-4 hover:border-[#2f5d50] ${state === "off" ? "opacity-50" : ""}`}
+      <section aria-labelledby="stage-heading">
+        <h1 id="stage-heading" className="text-4xl font-bold leading-none sm:text-5xl">
+          {next ? `Next: ${next.title.toLowerCase()}` : "Plan foundations complete"}
+        </h1>
+        <p className="mt-3 max-w-2xl text-[var(--muted)]">
+          {done} of {builtOn.length} available parts complete for a business at this stage.
+          {next ? ` ${next.summary}` : ""}
+        </p>
+
+        <div className="mt-6 track" role="list" aria-label="Business stage">
+          {ORDER.map((s, i) => (
+            <div
+              key={s}
+              role="listitem"
+              className="track-step"
+              data-state={i < stageIndex ? "done" : i === stageIndex ? "current" : "ahead"}
+              aria-current={i === stageIndex ? "step" : undefined}
             >
-              <div className="flex items-center justify-between">
-                <h3 className="font-semibold">
-                  <span className="mr-2 text-[#8a8983]">{p.num}</span>
-                  {p.title}
-                </h3>
-                <span className="rounded bg-[#f0efec] px-2 py-0.5 text-xs">{STATE_LABELS[state]}</span>
-              </div>
-              <p className="hint mt-1">{p.summary}</p>
-              <p className="mt-2 text-sm font-medium">
-                {p.built ? progress[p.slug] : "Screen coming in the next build"}
-              </p>
-            </Link>
-          );
-        })}
-      </div>
+              <span className="display block font-semibold">{STAGES[s]}</span>
+            </div>
+          ))}
+        </div>
+
+        <form action={updateStage} className="mt-3 flex flex-wrap items-center gap-2">
+          <input type="hidden" name="business_id" value={id} />
+          <label htmlFor="stage" className="hint">
+            Move to stage
+          </label>
+          <select className="input w-auto py-1.5" id="stage" name="stage" defaultValue={stage}>
+            {ORDER.map((s) => (
+              <option key={s} value={s}>
+                {STAGES[s]}
+              </option>
+            ))}
+          </select>
+          <button className="btn btn-secondary py-1.5">Change stage</button>
+        </form>
+      </section>
+
+      {GROUPS.map((g) => (
+        <section key={g.title} className="mt-12" aria-labelledby={`g-${g.title}`}>
+          <div className="flex items-baseline justify-between gap-4 border-b border-[var(--line)] pb-2">
+            <h2 id={`g-${g.title}`} className="text-2xl font-bold">
+              {g.title}
+            </h2>
+            <p className="hint hidden sm:block">{g.text}</p>
+          </div>
+          <ul className="mt-2 divide-y divide-[var(--line)]">
+            {g.parts.map((num) => {
+              const p = PARTS.find((x) => x.num === num)!;
+              const s = p.stages[stage];
+              const prog = progress.states[p.slug];
+              const tag = !p.built
+                ? { tone: "quiet", text: "Next build" }
+                : s === "off"
+                  ? { tone: "quiet", text: "Not used at this stage" }
+                  : STATE_TAG[prog ?? "empty"];
+              return (
+                <li key={p.slug}>
+                  <Link
+                    href={`/b/${id}/${p.slug}`}
+                    className={`group grid grid-cols-[2.5rem_1fr_auto] items-center gap-4 py-4 ${s === "off" ? "opacity-55" : ""}`}
+                  >
+                    <span className="display text-2xl font-bold text-[var(--muted)]">{p.num}</span>
+                    <span className="min-w-0">
+                      <span className="block font-semibold group-hover:underline group-hover:underline-offset-4">
+                        {p.title}
+                        {s !== "on" && s !== "off" && (
+                          <span className="ml-2 font-normal text-[var(--muted)]">({STATE_LABELS[s].toLowerCase()})</span>
+                        )}
+                      </span>
+                      <span className="hint block">{p.built ? progress.detail[p.slug] : p.summary}</span>
+                    </span>
+                    <span className="tag" data-tone={tag.tone}>
+                      {tag.text}
+                    </span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      ))}
     </div>
   );
 }

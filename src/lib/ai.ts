@@ -4,27 +4,83 @@ import { CANVAS_BOXES, EVIDENCE_KINDS, MODELS, STAGES, gradeOf, isStale, type Ev
 import { CANVAS_PLAIN } from "@/lib/programme";
 
 export const AI_MODEL = "claude-sonnet-5-5";
+export const REVIEWER_VERSION = 2;
 
+// ---------- The fixed checks ----------
+// The AI answers each check yes or no with a quote. The platform does the counting.
+// "computed" checks are worked out from the evidence grades, not by the AI.
+
+export type Check = { id: string; method: string; question: string; critical: boolean; computed?: boolean };
+
+export const CHECKS: Check[] = [
+  { id: "who_pays_specific", method: "Opportunity (Sahlman, Aulet)", question: "Is the paying customer specific enough that you could find and contact one this week?", critical: true },
+  { id: "why_choose", method: "Opportunity (Sahlman)", question: "Is there a concrete reason customers would choose this over what they do today?", critical: true },
+  { id: "evidence_behaviour", method: "Customer evidence (The Mom Test)", question: "Is the evidence for who pays and why based on what customers did or paid, rather than what they said they'd do?", critical: true },
+  { id: "critical_supported", method: "Assumption load (McGrath and MacMillan)", question: "Are the critical claims (who pays, why they'd choose you, price, costs) backed by at least medium evidence?", critical: true, computed: true },
+  { id: "money_adds_up", method: "Work back from profit (McGrath and MacMillan)", question: "Do the price, volume and costs given produce a profit at a volume the plan shows is realistic?", critical: true },
+  { id: "obstacle_real", method: "Diagnosis (Rumelt)", question: "Does the diagnosis name a specific obstacle, rather than a goal or ambition?", critical: true },
+  { id: "approach_tackles", method: "Diagnosis (Rumelt)", question: "Does the approach directly tackle the obstacle that was named?", critical: false },
+  { id: "actions_fit", method: "Diagnosis (Rumelt)", question: "Do the actions follow from the approach and support each other, rather than being a wish list?", critical: false },
+  { id: "choices_made", method: "Strategy (Rumelt, Roger Martin)", question: "Does the plan make clear choices about who it serves and what it won't do, rather than generic statements?", critical: false },
+  { id: "parts_agree", method: "Consistency", question: "Do the parts agree with each other: customers with channels, price with costs, targets with stage?", critical: false },
+  { id: "outside_risks", method: "Context (Sahlman)", question: "Does the plan recognise outside factors that could hurt it, such as competitors, regulation, suppliers or the economy?", critical: false },
+  { id: "survives_downside", method: "Cash and affordable loss", question: "Does the plan show the business could survive if its riskiest belief turned out wrong?", critical: false },
+];
+
+export const PEOPLE_QUESTIONS = [
+  "Have you, or someone working with you, done this kind of work successfully before?",
+  "Do you have the time, money and skills to carry out the next 90 days of this plan?",
+  "Who will you turn to when something goes wrong, and have you asked them?",
+];
+
+export const RESPONSES: Record<string, string> = {
+  fixed: "Fixed it in the plan",
+  testing: "Will test it",
+  accepted: "Accept the risk",
+  ignored: "Disagree, ignoring it",
+};
+
+export type CheckResult = { id: string; result: "yes" | "no"; quote: string; reason: string };
+export type Challenge = { area: string; severity: "critical" | "important" | "minor"; problem: string; question: string; smallest_test: string };
 export type CheckpointReview = {
+  version?: number;
   verdict: string;
   readiness: "ready" | "nearly" | "not_yet";
   strengths: string[];
-  challenges: { area: string; severity: "critical" | "important" | "minor"; problem: string; question: string; smallest_test: string }[];
+  challenges: Challenge[];
   contradictions: string[];
   riskiest_assumptions: string[];
+  checks?: CheckResult[];
 };
+
+const AI_CHECKS = CHECKS.filter((c) => !c.computed);
 
 const CHECKPOINT_SCHEMA = {
   type: "object",
   additionalProperties: false,
-  required: ["verdict", "readiness", "strengths", "challenges", "contradictions", "riskiest_assumptions"],
+  required: ["checks", "verdict", "readiness", "strengths", "challenges", "contradictions", "riskiest_assumptions"],
   properties: {
+    checks: {
+      type: "array",
+      description: "One entry for every check listed, in the order given.",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["id", "result", "quote", "reason"],
+        properties: {
+          id: { type: "string", enum: AI_CHECKS.map((c) => c.id) },
+          result: { type: "string", enum: ["yes", "no"] },
+          quote: { type: "string", description: "The exact words from the plan this answer relies on. Empty string if nothing relevant is written." },
+          reason: { type: "string", description: "One sentence explaining the answer." },
+        },
+      },
+    },
     verdict: { type: "string", description: "Two or three plain sentences: where this plan stands and the single most important thing to fix." },
     readiness: { type: "string", enum: ["ready", "nearly", "not_yet"] },
     strengths: { type: "array", items: { type: "string" }, description: "Up to three things that are genuinely solid, each tied to what's written." },
     challenges: {
       type: "array",
-      description: "Up to six challenges, most serious first.",
+      description: "Up to six challenges, most serious first. Base them on the checks that failed.",
       items: {
         type: "object",
         additionalProperties: false,
@@ -43,20 +99,27 @@ const CHECKPOINT_SCHEMA = {
   },
 };
 
-const SYSTEM = `You are an experienced business reviewer: someone who has started, run, funded and turned around businesses. You are reviewing a business plan at a checkpoint, before the owner commits to direction and numbers.
+const SYSTEM = `You are reviewing a business plan at a checkpoint, before the owner commits to direction and numbers. Review it as an experienced operator would: someone who has started and run businesses and cares whether this can actually be delivered week to week.
 
-Your job is to challenge, not to approve. Be direct and specific. No flattery, no padding, no generic advice that would apply to any business.
+Your job is to find what's wrong, not to approve. You are not predicting whether the business will succeed; you are finding gaps, contradictions and unproven beliefs. Be direct and specific. No flattery, no padding, no generic advice.
+
+First, answer every check you are given, strictly:
+- Answer "yes" only if the plan as written clearly meets the check. If it's missing, vague or only implied, answer "no".
+- Quote the exact words from the plan you relied on. If nothing relevant is written, leave the quote empty and answer "no".
+- Give one sentence of reason.
+Then write the verdict, challenges, contradictions, riskiest beliefs and strengths. Base the challenges on the checks that failed, most serious first.
 
 Rules:
-- Work only from what is written. Never invent facts about the business, its market or its numbers. If something is missing, say it's missing.
-- Each part of the business model carries an evidence grade: Proven (strong evidence such as signed contracts, payments or own trading data), Supported (medium evidence such as written commitments, quotes or independent data), Assumption (weak or no evidence). Treat Assumption as unproven, however confident the wording. Out-of-date evidence counts for less.
-- Focus on what matters most: who pays and why they'd choose this, whether the money adds up at a realistic volume, whether the stated obstacle is a real obstacle rather than a goal, and the beliefs that would sink the plan if wrong.
-- Check the parts against each other: customers versus channels, price versus costs, the obstacle versus the approach, targets versus the stage the business is at.
+- Work only from what is written. Never invent facts about the business, its market or its numbers.
+- Evidence grades: Proven (strong: signed contracts, payments, own trading data), Supported (medium: written commitments, quotes, independent data), Assumption (weak or none). Treat Assumption as unproven, however confident the wording. Out-of-date evidence counts for less.
+- Match the stage. A business that hasn't made a sale should be tested on whether anyone will pay. An established business should be tested on its numbers and what last year taught it.
 - For every challenge, give the smallest, cheapest test the owner could run this week, with a clear pass mark.
-- Match the stage. A business that hasn't made a sale yet should be tested on whether anyone will pay. An established business should be tested on its numbers and what last year taught it.
+- Never say or imply the business will or won't succeed, is investable, or is approved.
 - Write in plain British English, to the owner as "you". Short sentences. No jargon; if a technical term helps, put the plain words first.`;
 
-export async function buildPlanText(supabase: SupabaseClient, businessId: string) {
+const CRITICAL_BOXES = ["customer_segments", "value_proposition", "revenue_streams", "cost_structure"];
+
+export async function loadPlan(supabase: SupabaseClient, businessId: string) {
   const [{ data: biz }, { data: canvas }, { data: evidence }, { data: diag }, { data: dir }, { data: assumptions }, { data: milestones }, { data: lookback }] =
     await Promise.all([
       supabase.from("businesses").select("name, sector, model, stage, country, currency").eq("id", businessId).single(),
@@ -68,6 +131,13 @@ export async function buildPlanText(supabase: SupabaseClient, businessId: string
       supabase.from("milestones").select("sequence, name, description, spend_limit, due_date, status").eq("business_id", businessId).order("sequence"),
       supabase.from("lookbacks").select("*").eq("business_id", businessId).order("updated_at", { ascending: false }).limit(1).maybeSingle(),
     ]);
+
+  const grades: Record<string, string> = {};
+  for (const b of CANVAS_BOXES) {
+    const answer = (canvas ?? []).find((c) => c.box === b.key)?.answer?.trim() ?? "";
+    const items = (evidence ?? []).filter((e) => e.subject_key === b.key);
+    grades[b.key] = gradeOf(!!answer, items as { strength: EvidenceStrength; evidence_date: string }[]);
+  }
 
   const cur = biz?.currency ?? "";
   const lines: string[] = [];
@@ -81,7 +151,7 @@ export async function buildPlanText(supabase: SupabaseClient, businessId: string
   for (const b of CANVAS_BOXES) {
     const answer = (canvas ?? []).find((c) => c.box === b.key)?.answer?.trim() ?? "";
     const items = (evidence ?? []).filter((e) => e.subject_key === b.key);
-    const grade = gradeOf(!!answer, items as { strength: EvidenceStrength; evidence_date: string }[]);
+    const grade = grades[b.key];
     lines.push(`\n## ${CANVAS_PLAIN[b.key]?.question ?? b.title}`);
     lines.push(`Answer: ${answer || "(empty)"}`);
     lines.push(`Evidence grade: ${grade === "empty" ? "Empty" : grade[0].toUpperCase() + grade.slice(1)}`);
@@ -117,20 +187,52 @@ export async function buildPlanText(supabase: SupabaseClient, businessId: string
     for (const it of (lookback.items ?? []) as Record<string, unknown>[]) lines.push(`- ${JSON.stringify(it)}`);
     for (const k of ["furthest_wrong", "lost_why", "least_profitable", "no_payback", "biggest_lesson"]) if (lookback[k]) lines.push(`${k.replace(/_/g, " ")}: ${lookback[k]}`);
   }
-  return lines.join("\n");
+  return { text: lines.join("\n"), grades };
 }
 
-export async function runCheckpointReview(planText: string) {
+function computedChecks(grades: Record<string, string>): CheckResult[] {
+  const weak = CRITICAL_BOXES.filter((k) => !["proven", "supported"].includes(grades[k]));
+  const names = weak.map((k) => CANVAS_PLAIN[k]?.question ?? k);
+  return [
+    {
+      id: "critical_supported",
+      result: weak.length ? "no" : "yes",
+      quote: "",
+      reason: weak.length ? `Still unproven: ${names.join("; ")}.` : "Every critical claim has at least medium evidence.",
+    },
+  ];
+}
+
+export async function runCheckpointReview(supabase: SupabaseClient, businessId: string) {
   if (!process.env.ANTHROPIC_API_KEY) throw new Error("The AI review isn't switched on yet: the API key is missing.");
+  const { text, grades } = await loadPlan(supabase, businessId);
+  const checkList = AI_CHECKS.map((c, i) => `${i + 1}. [${c.id}] ${c.question}`).join("\n");
   const client = new Anthropic();
   const msg = await client.messages.create({
     model: AI_MODEL,
-    max_tokens: 4000,
+    max_tokens: 6000,
     system: SYSTEM,
     output_config: { effort: "medium", format: { type: "json_schema", schema: CHECKPOINT_SCHEMA } },
-    messages: [{ role: "user", content: `Review this plan at the checkpoint.\n\n${planText}` }],
+    messages: [{ role: "user", content: `CHECKS TO ANSWER\n${checkList}\n\nTHE PLAN\n${text}` }],
   });
-  const text = msg.content.map((c) => (c.type === "text" ? c.text : "")).join("");
-  const content = JSON.parse(text) as CheckpointReview;
+  const raw = msg.content.map((c) => (c.type === "text" ? c.text : "")).join("");
+  const content = JSON.parse(raw) as CheckpointReview;
+  // Every check gets an answer: anything the AI skipped counts as not met.
+  const answered = new Map((content.checks ?? []).map((c) => [c.id, c]));
+  const all: CheckResult[] = [];
+  for (const c of CHECKS) {
+    if (c.computed) continue;
+    all.push(answered.get(c.id) ?? { id: c.id, result: "no", quote: "", reason: "Not assessed." });
+  }
+  content.checks = [...computedChecks(grades), ...all];
+  content.version = REVIEWER_VERSION;
   return { content, model: msg.model, input_tokens: msg.usage.input_tokens, output_tokens: msg.usage.output_tokens };
+}
+
+export function tally(checks: CheckResult[] = []) {
+  const byId = new Map(checks.map((c) => [c.id, c]));
+  const crit = CHECKS.filter((c) => c.critical);
+  const rest = CHECKS.filter((c) => !c.critical);
+  const pass = (list: Check[]) => list.filter((c) => byId.get(c.id)?.result === "yes").length;
+  return { critPassed: pass(crit), critTotal: crit.length, restPassed: pass(rest), restTotal: rest.length };
 }

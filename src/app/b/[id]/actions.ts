@@ -1,7 +1,7 @@
 "use server";
 
 import { randomUUID, randomBytes, createHash } from "crypto";
-import { buildPlanText, runCheckpointReview } from "@/lib/ai";
+import { runCheckpointReview, RESPONSES } from "@/lib/ai";
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -604,8 +604,7 @@ export async function runAiReview(formData: FormData) {
   } = await supabase.auth.getUser();
   let message: string | null = null;
   try {
-    const plan = await buildPlanText(supabase, businessId);
-    const r = await runCheckpointReview(plan);
+    const r = await runCheckpointReview(supabase, businessId);
     const { error } = await supabase.from("ai_reviews").insert({
       business_id: businessId,
       kind: "checkpoint",
@@ -614,6 +613,7 @@ export async function runAiReview(formData: FormData) {
       model: r.model,
       input_tokens: r.input_tokens,
       output_tokens: r.output_tokens,
+      version: r.content.version ?? 1,
       created_by: user?.id ?? null,
     });
     if (error) message = error.message;
@@ -631,6 +631,14 @@ export async function acceptAiReview(formData: FormData) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
+  const reviewId = str(formData, "review_id");
+  if (reviewId) {
+    const responses: Record<string, string> = {};
+    for (const [k, v] of formData.entries()) {
+      if (k.startsWith("resp_") && String(v) in RESPONSES) responses[k.slice(5)] = String(v);
+    }
+    await supabase.from("ai_reviews").update({ responses, responded_at: new Date().toISOString() }).eq("id", reviewId);
+  }
   const { error } = await supabase
     .from("programme_sessions")
     .update({

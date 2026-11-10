@@ -7,7 +7,7 @@ import { CANVAS_BOXES, gradeOf, type EvidenceStrength } from "@/lib/framework";
 import { addEvidence, deleteEvidence, recordReview, finishSession, saveCanvas, saveDiagnosis, saveLookback, runAiReview, acceptAiReview } from "../../actions";
 import AiReviewCard from "@/components/AiReviewCard";
 import PendingButton from "@/components/PendingButton";
-import type { CheckpointReview } from "@/lib/ai";
+import { RESPONSES, type CheckpointReview } from "@/lib/ai";
 
 export const maxDuration = 60;
 import Notice from "@/components/Notice";
@@ -47,7 +47,7 @@ export default async function SessionPage({
   } = await supabase.auth.getUser();
 
   const { data: aiReview } = key === "checkpoint_1"
-    ? await supabase.from("ai_reviews").select("content, created_at").eq("business_id", id).eq("kind", "checkpoint").order("created_at", { ascending: false }).limit(1).maybeSingle()
+    ? await supabase.from("ai_reviews").select("id, content, created_at, responses").eq("business_id", id).eq("kind", "checkpoint").order("created_at", { ascending: false }).limit(1).maybeSingle()
     : { data: null };
   const [{ data: biz }, { data: row }, { data: me }, { data: canvas }, { data: evidence }, { data: diag }] = await Promise.all([
     supabase.from("businesses").select("name, model, stage, currency").eq("id", id).single(),
@@ -284,7 +284,7 @@ export default async function SessionPage({
               </form>
             ) : null}
             {row?.approved_at && aiReview ? (
-              <AiReviewCard review={aiReview.content as CheckpointReview} createdAt={aiReview.created_at} />
+              <AiReviewCard review={aiReview.content as CheckpointReview} createdAt={aiReview.created_at} responses={aiReview.responses as Record<string, string>} />
             ) : null}
             {row?.approved_at ? null : (
               <div className="space-y-4">
@@ -344,11 +344,32 @@ export default async function SessionPage({
                 </div>
                 {aiReview && (
                   <>
-                    <AiReviewCard review={aiReview.content as CheckpointReview} createdAt={aiReview.created_at} />
-                    <form action={acceptAiReview} className="card space-y-3 p-5">
+                    <AiReviewCard review={aiReview.content as CheckpointReview} createdAt={aiReview.created_at} responses={aiReview.responses as Record<string, string>} />
+                    <form action={acceptAiReview} className="card space-y-4 p-5">
                       <input type="hidden" name="business_id" value={id} />
                       <input type="hidden" name="session_key" value={key} />
-                      <label className="label" htmlFor="ai_notes">What will you change or test because of this?</label>
+                      <input type="hidden" name="review_id" value={aiReview.id} />
+                      <div>
+                        <h3 className="display text-xl font-bold">Your response</h3>
+                        <p className="hint mt-1">
+                          Say what you&apos;ll do about each challenge. Disagreeing is allowed: it&apos;s how the reviewer
+                          learns which challenges matter.
+                        </p>
+                      </div>
+                      {(aiReview.content as CheckpointReview).challenges.map((c, i) => (
+                        <div key={i} className="grid gap-2 sm:grid-cols-[1fr_15rem] sm:items-center">
+                          <label htmlFor={`resp_${i}`} className="text-sm">
+                            <span className="font-semibold">{i + 1}. {c.area}</span>
+                          </label>
+                          <select id={`resp_${i}`} name={`resp_${i}`} required className="input" defaultValue="">
+                            <option value="" disabled>Choose</option>
+                            {Object.entries(RESPONSES).map(([k, v]) => (
+                              <option key={k} value={k}>{v}</option>
+                            ))}
+                          </select>
+                        </div>
+                      ))}
+                      <label className="label" htmlFor="ai_notes">What will you change or test first?</label>
                       <textarea id="ai_notes" name="review_notes" required rows={3} className="input" />
                       <button className="btn">Mark the checkpoint reviewed and carry on</button>
                     </form>

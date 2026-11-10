@@ -45,7 +45,6 @@ export default async function CanvasPage({
           initial={initial}
           evidence={evidence ?? []}
           examples={guide.canvas}
-          evidenceExample={guide.evidence}
           action={saveCanvas}
           addEvidence={addEvidence}
           deleteEvidence={deleteEvidence}

@@ -34,7 +34,6 @@ export default function EvidencePanel({
   onClose,
   addAction,
   deleteAction,
-  summaryExample,
 }: {
   businessId: string;
   subjectType: string;
@@ -45,7 +44,6 @@ export default function EvidencePanel({
   onClose: () => void;
   addAction: Action;
   deleteAction: Action;
-  summaryExample?: string;
 }) {
   const [kind, setKind] = useState("written_commitment");
   const [error, setError] = useState<string | null>(null);
@@ -206,7 +204,7 @@ export default function EvidencePanel({
               required
               rows={2}
               className="input"
-              placeholder={summaryExample ?? "What the evidence shows, in one line"}
+              placeholder={selected.summary}
             />
           </div>
           <div className="grid gap-3 sm:grid-cols-2">

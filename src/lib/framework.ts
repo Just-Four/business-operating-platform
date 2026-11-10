@@ -140,15 +140,15 @@ export function label(value: string) {
 
 export type EvidenceStrength = "strong" | "medium" | "weak";
 
-export const EVIDENCE_KINDS: { key: string; label: string; strength: EvidenceStrength; example: string }[] = [
-  { key: "signed_contract", label: "Signed contract", strength: "strong", example: "Customer contract, lease, supplier agreement" },
-  { key: "booking_or_payment", label: "Booking or payment", strength: "strong", example: "Purchase order, deposit paid, confirmed booking" },
-  { key: "own_trading_data", label: "Our own trading data", strength: "strong", example: "Sales, invoices, usage or accounts from our own records" },
-  { key: "written_commitment", label: "Written commitment", strength: "medium", example: "Letter of intent, email confirming they want to proceed" },
-  { key: "supplier_quote", label: "Written quote", strength: "medium", example: "Supplier price, quoted terms, written offer" },
-  { key: "independent_data", label: "Independent data", strength: "medium", example: "Market report, public statistics, industry data" },
-  { key: "conversation", label: "Conversation", strength: "weak", example: "Call or meeting with no written follow-up" },
-  { key: "past_experience", label: "Past experience", strength: "weak", example: "What happened in a previous business or market" },
+export const EVIDENCE_KINDS: { key: string; label: string; strength: EvidenceStrength; example: string; summary: string }[] = [
+  { key: "signed_contract", label: "Signed contract", strength: "strong", example: "Customer or supplier agreement, signed by both sides", summary: "e.g. 12-month contract signed with a named customer" },
+  { key: "booking_or_payment", label: "Order or payment", strength: "strong", example: "Purchase order, deposit or payment received", summary: "e.g. Purchase order received for the first 3 months" },
+  { key: "own_trading_data", label: "Our own trading data", strength: "strong", example: "Sales, invoices, usage or accounts from our own records", summary: "e.g. Last quarter's sales report from the accounts" },
+  { key: "written_commitment", label: "Written commitment", strength: "medium", example: "Letter of intent, or an email confirming they want to proceed", summary: "e.g. Email from a named customer confirming they will buy" },
+  { key: "supplier_quote", label: "Written quote", strength: "medium", example: "A supplier's written price or terms", summary: "e.g. Supplier's written price for 12 months of supply" },
+  { key: "independent_data", label: "Independent data", strength: "medium", example: "Market report, public statistics, industry data", summary: "e.g. Official statistics on the size of the market" },
+  { key: "conversation", label: "Conversation", strength: "weak", example: "Call or meeting with no written follow-up", summary: "e.g. Call with a named buyer about what they need" },
+  { key: "past_experience", label: "Past experience", strength: "weak", example: "What happened in a previous business or market", summary: "e.g. Results from a similar business we ran before" },
 ];
 
 export const STRENGTH_LABEL: Record<EvidenceStrength, string> = {

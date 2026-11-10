@@ -40,7 +40,6 @@ export default function CanvasBoard({
   initial,
   evidence,
   examples,
-  evidenceExample,
   action,
   addEvidence,
   deleteEvidence,
@@ -49,7 +48,6 @@ export default function CanvasBoard({
   initial: Record<string, string>;
   evidence: EvidenceItem[];
   examples: Record<string, string>;
-  evidenceExample: string;
   action: (formData: FormData) => void | Promise<void>;
   addEvidence: EvAction;
   deleteEvidence: EvAction;
@@ -93,7 +91,7 @@ export default function CanvasBoard({
           <span className="tag" data-tone="wait">{counts.supported} supported</span>
           <span className="tag" data-tone="stop">{counts.assumption} assumptions</span>
           <span className="tag" data-tone="quiet">{counts.empty} empty</span>
-          <span className="hint ml-1">Proven needs strong evidence: a contract, a booking or payment, or our own trading data.</span>
+          <span className="hint ml-1">Proven needs strong evidence: a signed contract, an order or payment, or our own trading data.</span>
         </div>
 
         <div className="canvas-board">
@@ -159,7 +157,6 @@ export default function CanvasBoard({
           onClose={close}
           addAction={addEvidence}
           deleteAction={deleteEvidence}
-          summaryExample={evidenceExample}
         />
       )}
     </>

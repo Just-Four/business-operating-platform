@@ -88,6 +88,12 @@ export default async function BusinessLayout({
               </details>
             )}
           </nav>
+          <nav className="mt-8 border-t border-white/15 pt-4 text-sm" aria-label="Run the business">
+            <p className="mb-2 text-white/60">Run the business</p>
+            <Link href={`/b/${id}/team`} className="block rounded px-2 py-1.5 hover:bg-white/10">Roles and team</Link>
+            <Link href={`/b/${id}/scorecards`} className="block rounded px-2 py-1.5 hover:bg-white/10">Scorecards</Link>
+            <Link href={`/b/${id}/tasks`} className="block rounded px-2 py-1.5 hover:bg-white/10">Tasks</Link>
+          </nav>
           <div className="mt-8 border-t border-white/15 pt-4 text-sm">
             <p className="truncate text-white/60">{user?.email}</p>
             <form action={signOut}>

@@ -43,6 +43,17 @@ h3,
 }
 
 @layer components {
+  .rag {
+    display: inline-block;
+    width: 0.6rem;
+    height: 0.6rem;
+    border-radius: 999px;
+    background: var(--line);
+  }
+  .rag[data-rag="green"] { background: var(--go); }
+  .rag[data-rag="amber"] { background: var(--wait); }
+  .rag[data-rag="red"] { background: var(--stop); }
+
 .input {
   width: 100%;
   border: 1px solid var(--line);

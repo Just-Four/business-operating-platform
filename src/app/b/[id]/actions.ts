@@ -1,5 +1,7 @@
 "use server";
 
+import { randomUUID, randomBytes, createHash } from "crypto";
+
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
@@ -425,4 +427,167 @@ export async function saveLookback(formData: FormData) {
     { onConflict: "business_id,period_label" }
   );
   await done(formData, supabase, businessId, "", error?.message);
+}
+
+// ---------- Run side: roles, scorecards, tasks, agent keys ----------
+
+export async function saveRole(formData: FormData) {
+  const businessId = String(formData.get("business_id"));
+  const id = str(formData, "id");
+  const supabase = await createClient();
+  const gates = (str(formData, "approval_gates") ?? "")
+    .split("\n")
+    .map((g) => g.trim())
+    .filter(Boolean);
+  const row = {
+    business_id: businessId,
+    name: str(formData, "name") ?? "Unnamed role",
+    purpose: str(formData, "purpose"),
+    filled_by: str(formData, "filled_by"),
+    route: str(formData, "route") ?? "person",
+    fallback_route: str(formData, "fallback_route"),
+    standing_instructions: str(formData, "standing_instructions"),
+    knowledge: str(formData, "knowledge"),
+    capacity_trigger: str(formData, "capacity_trigger"),
+    approval_gates: gates,
+  };
+  const { error } = id
+    ? await supabase.from("roles").update(row).eq("id", id)
+    : await supabase.from("roles").insert(row);
+  await done(formData, supabase, businessId, "team", error?.message);
+}
+
+export async function addMeasure(formData: FormData) {
+  const businessId = String(formData.get("business_id"));
+  const supabase = await createClient();
+  const { error } = await supabase.from("measures").insert({
+    business_id: businessId,
+    role_id: str(formData, "role_id"),
+    name: str(formData, "name") ?? "",
+    kind: str(formData, "kind") ?? "lead",
+    unit: str(formData, "unit"),
+    target: num(formData, "target"),
+    target_period: str(formData, "target_period") ?? "week",
+    better_when: str(formData, "better_when") ?? "higher",
+    data_source: str(formData, "data_source"),
+  });
+  await done(formData, supabase, businessId, "scorecards", error?.message);
+}
+
+export async function saveReadings(formData: FormData) {
+  const businessId = String(formData.get("business_id"));
+  const period = String(formData.get("period_start"));
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const rows: { business_id: string; measure_id: string; period_start: string; value: number; recorded_by: string | null; source: string }[] = [];
+  for (const [k, v] of formData.entries()) {
+    if (!k.startsWith("reading_")) continue;
+    const s = String(v).trim();
+    if (!s) continue;
+    const n = Number(s.replace(/[, ]/g, ""));
+    if (!Number.isFinite(n)) continue;
+    rows.push({ business_id: businessId, measure_id: k.slice(8), period_start: period, value: n, recorded_by: user?.id ?? null, source: "manual" });
+  }
+  const { error } = rows.length
+    ? await supabase.from("measure_readings").upsert(rows, { onConflict: "measure_id,period_start" })
+    : { error: null };
+  await done(formData, supabase, businessId, "scorecards", error?.message);
+}
+
+export async function addTask(formData: FormData) {
+  const businessId = String(formData.get("business_id"));
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const roleId = str(formData, "role_id");
+  let route = str(formData, "route");
+  let fallback = str(formData, "fallback_route");
+  if (roleId && (!route || !fallback)) {
+    const { data: role } = await supabase.from("roles").select("route, fallback_route").eq("id", roleId).single();
+    route = route ?? role?.route ?? "person";
+    fallback = fallback ?? role?.fallback_route ?? null;
+  }
+  const id = randomUUID();
+  const { error } = await supabase.from("tasks").insert({
+    id,
+    business_id: businessId,
+    role_id: roleId,
+    title: str(formData, "title") ?? "",
+    detail: str(formData, "detail"),
+    route: route ?? "person",
+    fallback_route: fallback,
+    due_date: str(formData, "due_date"),
+    needs_approval: formData.get("needs_approval") === "1",
+    created_by: user?.id ?? null,
+  });
+  if (!error) {
+    await supabase.from("task_events").insert({ business_id: businessId, task_id: id, event: "created", actor: user?.email ?? "user" });
+  }
+  await done(formData, supabase, businessId, "tasks", error?.message);
+}
+
+export async function updateTask(formData: FormData) {
+  const businessId = String(formData.get("business_id"));
+  const taskId = String(formData.get("task_id"));
+  const action = String(formData.get("action"));
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const actor = user?.email ?? "user";
+  const patch: Record<string, unknown> = {};
+  if (action === "approve") {
+    patch.approved_at = new Date().toISOString();
+    patch.approved_by = user?.id ?? null;
+  } else if (action === "start") patch.status = "in_progress";
+  else if (action === "done") {
+    patch.status = "done";
+    patch.result = str(formData, "result");
+  } else if (action === "block") patch.status = "blocked";
+  else if (action === "cancel") patch.status = "cancelled";
+  else if (action === "requeue") patch.status = "queued";
+  const { error } = await supabase.from("tasks").update(patch).eq("id", taskId);
+  if (!error) {
+    await supabase.from("task_events").insert({
+      business_id: businessId,
+      task_id: taskId,
+      event: action === "approve" ? "approved" : `marked ${String(patch.status ?? action).replace("_", " ")}`,
+      actor,
+      detail: str(formData, "result"),
+    });
+  }
+  await done(formData, supabase, businessId, "tasks", error?.message);
+}
+
+export async function createAgentKey(formData: FormData) {
+  const businessId = String(formData.get("business_id"));
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const key = `bop_${randomBytes(24).toString("base64url")}`;
+  const hash = createHash("sha256").update(key).digest("hex");
+  const { error } = await supabase.from("agent_keys").insert({
+    business_id: businessId,
+    label: str(formData, "label") ?? "Agent",
+    route: str(formData, "route") ?? "grok_bot",
+    key_hash: hash,
+    key_hint: key.slice(-4),
+    created_by: user?.id ?? null,
+  });
+  revalidatePath(`/b/${businessId}`, "layout");
+  if (error) redirect(`/b/${businessId}/tasks?error=${encodeURIComponent(error.message)}`);
+  // Shown once; never stored in readable form.
+  redirect(`/b/${businessId}/tasks?newkey=${encodeURIComponent(key)}#agents`);
+}
+
+export async function revokeAgentKey(formData: FormData) {
+  const businessId = String(formData.get("business_id"));
+  const supabase = await createClient();
+  await supabase.from("agent_keys").update({ revoked_at: new Date().toISOString() }).eq("id", String(formData.get("id")));
+  revalidatePath(`/b/${businessId}`, "layout");
+  redirect(`/b/${businessId}/tasks#agents`);
 }

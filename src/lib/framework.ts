@@ -90,7 +90,7 @@ export const PARTS: Part[] = [
     slug: "scorecards",
     title: "Scorecards",
     summary: "Lead and lag measures for every priority and role, fed from real systems.",
-    built: false,
+    built: true,
     stages: { launch: "on", early_revenue: "on", established: "on" },
   },
   {
@@ -98,7 +98,7 @@ export const PARTS: Part[] = [
     slug: "team",
     title: "Roles and team",
     summary: "Role cards with scorecard, instructions, route, fallback and approval gates.",
-    built: false,
+    built: true,
     stages: { launch: "on", early_revenue: "on", established: "on" },
   },
   {
@@ -172,4 +172,34 @@ export function gradeOf(hasAnswer: boolean, items: { strength: EvidenceStrength;
   if (fresh.some((i) => i.strength === "strong")) return "proven";
   if (fresh.some((i) => i.strength === "medium")) return "supported";
   return "assumption";
+}
+
+export const ROUTES: Record<string, { label: string; help: string }> = {
+  person: { label: "A person", help: "Someone in the team does it" },
+  grok_bot: { label: "AI agent (Grok Bot)", help: "An always-on AI agent that can use a browser and apps" },
+  claude: { label: "AI assistant (Claude)", help: "Drafting, analysis, research and reviews" },
+  n8n: { label: "Automation (n8n)", help: "Routine steps with no judgement: data pulls, reminders, reports" },
+  cheap_model: { label: "Low-cost AI model", help: "Small AI tasks inside automations: sorting, summarising, drafting" },
+};
+
+export const DEFAULT_GATES = [
+  "Spend or commitment above the set limit",
+  "Signing, accepting or changing any contract",
+  "Contacting a client, supplier or partner for the first time or in a new way",
+  "Changing prices, terms or published information",
+];
+
+export function weekStart(d = new Date()) {
+  const x = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const day = x.getUTCDay() || 7;
+  x.setUTCDate(x.getUTCDate() - day + 1);
+  return x.toISOString().slice(0, 10);
+}
+
+export function ragOf(value: number | null | undefined, target: number | null | undefined, betterWhen: string) {
+  if (value === null || value === undefined || target === null || target === undefined || target === 0) return "none";
+  const ratio = betterWhen === "lower" ? target / Math.max(value, 0.0001) : value / target;
+  if (ratio >= 1) return "green";
+  if (ratio >= 0.9) return "amber";
+  return "red";
 }

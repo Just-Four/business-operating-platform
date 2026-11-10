@@ -42,8 +42,10 @@ async function completeSessionInternal(supabase: SupabaseClient, businessId: str
     },
     { onConflict: "business_id,key" }
   );
-  // Ahead of schedule: pull the remaining sessions forward by the days gained.
-  if (row?.scheduled_on && row.scheduled_on > today) {
+  // Ahead of schedule: pull the remaining sessions forward by the days gained,
+  // but only when every earlier session is done (finishing out of order doesn't count).
+  const earlierOpen = (rows ?? []).some((r) => r.seq < seq && !r.completed_at);
+  if (!earlierOpen && row?.scheduled_on && row.scheduled_on > today) {
     const gained = Math.round((new Date(row.scheduled_on).getTime() - new Date(today).getTime()) / 86_400_000);
     for (const r of rows ?? []) {
       if (r.completed_at || r.key === key || !r.scheduled_on || r.seq <= seq) continue;

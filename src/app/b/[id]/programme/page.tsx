@@ -71,15 +71,21 @@ export default async function ProgrammePage({
             const r = byKey.get(s.key);
             const st = status({ completed_at: r?.completed_at ?? null, scheduled_on: r?.scheduled_on ?? null }, s.built, today);
             return (
-              <li key={s.key} className="grid grid-cols-[2.5rem_1fr_auto_auto] items-center gap-3 py-3">
-                <span className="display text-xl font-bold text-[var(--muted)]">{s.seq}</span>
+              <li
+                key={s.key}
+                className={`grid grid-cols-[2.5rem_1fr_auto_auto] items-center gap-3 py-3 ${s.checkpoint ? "-mx-3 my-1 rounded border-l-4 border-[var(--wait)] bg-[var(--wait-tint)] px-3" : ""}`}
+              >
+                <span className={`display text-xl font-bold ${s.checkpoint ? "text-[#8a5d0f]" : "text-[var(--muted)]"}`}>{s.seq}</span>
                 <span className="min-w-0">
-                  <Link href={`/b/${id}/s/${s.key}`} className="font-semibold hover:underline hover:underline-offset-4">
+                  <Link
+                    href={`/b/${id}/s/${s.key}`}
+                    className={`hover:underline hover:underline-offset-4 ${s.checkpoint ? "display text-lg font-bold" : "font-semibold"}`}
+                  >
                     {s.title}
                   </Link>
                   <span className="hint block">
                     About {s.minutes} min
-                    {s.checkpoint ? (r?.approved_at ? ", reviewed" : ", review checkpoint") : ""}
+                    {s.checkpoint ? (r?.approved_at ? ", reviewed" : ", review checkpoint: have your plan challenged") : ""}
                   </span>
                 </span>
                 <input

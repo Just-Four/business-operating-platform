@@ -209,6 +209,7 @@ h3,
   flex: 1;
   width: 100%;
   min-height: 90px;
+  overflow: hidden;
   resize: none;
   border: 0;
   background: transparent;
@@ -222,12 +223,27 @@ h3,
 .tile:focus-within {
   border-color: var(--ink);
 }
-.tile-evidence {
-  width: 100%;
-  border: 0;
+.tile-area::placeholder {
+  color: #9aa2b0;
+}
+.tile-evidence-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
   border-top: 1px dashed var(--line);
   padding-top: 6px;
   margin-top: 6px;
+}
+.tile-evidence-label {
+  flex: none;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.tile-evidence {
+  min-width: 0;
+  flex: 1;
+  border: 0;
   font-size: 12.5px;
   background: transparent;
   color: var(--ink);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { CANVAS_BOXES } from "@/lib/framework";
 
 const AREA: Record<string, string> = {
@@ -16,6 +16,17 @@ const AREA: Record<string, string> = {
 };
 
 type Row = { answer: string; evidence: string };
+
+function AutoTextarea(props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [props.value]);
+  return <textarea ref={ref} rows={3} {...props} />;
+}
 
 export default function CanvasBoard({
   businessId,
@@ -88,21 +99,25 @@ export default function CanvasBoard({
                 )}
               </div>
               <p className="hint mt-1 mb-2 leading-snug">{box.question}</p>
-              <textarea
+              <AutoTextarea
                 id={`${box.key}_answer`}
+                placeholder="Write your answer here"
                 name={`${box.key}_answer`}
                 className="tile-area"
                 value={row.answer}
                 onChange={(e) => update(box.key, "answer", e.target.value)}
               />
-              <input
-                name={`${box.key}_evidence`}
-                aria-label={`Evidence for ${box.title}`}
-                className="tile-evidence"
-                placeholder="Evidence"
-                value={row.evidence}
-                onChange={(e) => update(box.key, "evidence", e.target.value)}
-              />
+              <label className="tile-evidence-row">
+                <span className="tile-evidence-label">Evidence</span>
+                <input
+                  name={`${box.key}_evidence`}
+                  aria-label={`Evidence for ${box.title}`}
+                  className="tile-evidence"
+                  placeholder="contract, data or conversation"
+                  value={row.evidence}
+                  onChange={(e) => update(box.key, "evidence", e.target.value)}
+                />
+              </label>
             </div>
           );
         })}

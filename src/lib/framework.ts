@@ -10,6 +10,10 @@ export const STAGES: Record<Stage, string> = {
 export const MODELS: Record<string, string> = {
   workforce_accommodation: "Workforce accommodation",
   booking_platform: "Booking platform",
+  hospitality: "B&B, hotel or short lets",
+  training_events: "Training, courses or events",
+  professional_services: "Professional services",
+  retail_ecommerce: "Retail or e-commerce",
   other: "Other",
 };
 
@@ -119,20 +123,11 @@ export const CANVAS_BOXES: { key: string; title: string; question: string }[] = 
   { key: "value_proposition", title: "Value proposition", question: "What problem do we solve for each segment, and why us rather than the alternative?" },
   { key: "channels", title: "Channels", question: "How do customers find us, buy from us, and receive what they bought?" },
   { key: "customer_relationships", title: "Customer relationships", question: "How do we win them, keep them and grow them? Personal, contract, self-service?" },
-  { key: "revenue_streams", title: "Revenue streams", question: "What do they pay for, how (per night, per month, per contract), and at what price?" },
-  { key: "key_resources", title: "Key resources", question: "What must we have to deliver: properties, people, systems, cash, licences?" },
+  { key: "revenue_streams", title: "Revenue streams", question: "What do they pay for, how (per unit, per month, per contract), and at what price?" },
+  { key: "key_resources", title: "Key resources", question: "What must we have to deliver: assets, people, systems, cash, licences?" },
   { key: "key_activities", title: "Key activities", question: "What must we do well every week to deliver and win business?" },
-  { key: "key_partners", title: "Key partners", question: "Who do we rely on: landlords, cleaners, suppliers, agents?" },
+  { key: "key_partners", title: "Key partners", question: "Who do we rely on outside the business to deliver?" },
   { key: "cost_structure", title: "Cost structure", question: "What are the biggest costs, which are fixed and which vary with volume?" },
-];
-
-export const STANDARD_MILESTONES: { name: string; description: string }[] = [
-  { name: "Set up", description: "Company, bank, insurance, contracts, booking and accounts systems." },
-  { name: "Demand proven", description: "First client conversations; written interest or a letter of intent." },
-  { name: "Supply proven", description: "First properties secured at a cost that works in the reverse income statement." },
-  { name: "First contract", description: "Signed, with start date and payment terms." },
-  { name: "First occupancy", description: "Guests in beds and the first invoice paid." },
-  { name: "Repeatable", description: "A second client and a second property won without the operator doing everything personally." },
 ];
 
 export const ASSUMPTION_STATUSES = ["untested", "testing", "proven", "disproven"] as const;
@@ -145,12 +140,12 @@ export function label(value: string) {
 export type EvidenceStrength = "strong" | "medium" | "weak";
 
 export const EVIDENCE_KINDS: { key: string; label: string; strength: EvidenceStrength; example: string }[] = [
-  { key: "signed_contract", label: "Signed contract", strength: "strong", example: "Lease, client contract, framework agreement" },
+  { key: "signed_contract", label: "Signed contract", strength: "strong", example: "Customer contract, lease, supplier agreement" },
   { key: "booking_or_payment", label: "Booking or payment", strength: "strong", example: "Purchase order, deposit paid, confirmed booking" },
-  { key: "own_trading_data", label: "Our own trading data", strength: "strong", example: "Occupancy, invoices, accounts from our own records" },
+  { key: "own_trading_data", label: "Our own trading data", strength: "strong", example: "Sales, invoices, usage or accounts from our own records" },
   { key: "written_commitment", label: "Written commitment", strength: "medium", example: "Letter of intent, email confirming they want to proceed" },
-  { key: "supplier_quote", label: "Written quote", strength: "medium", example: "Landlord offer, furniture or cleaning quote" },
-  { key: "independent_data", label: "Independent data", strength: "medium", example: "Market report, public statistics, project pipeline" },
+  { key: "supplier_quote", label: "Written quote", strength: "medium", example: "Supplier price, landlord offer, quoted terms" },
+  { key: "independent_data", label: "Independent data", strength: "medium", example: "Market report, public statistics, industry data" },
   { key: "conversation", label: "Conversation", strength: "weak", example: "Call or meeting with no written follow-up" },
   { key: "past_experience", label: "Past experience", strength: "weak", example: "What happened in a previous business or market" },
 ];

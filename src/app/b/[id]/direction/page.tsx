@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { saveDirection } from "../actions";
 import Notice from "@/components/Notice";
+import { guidanceFor } from "@/lib/guidance";
 
 export default async function DirectionPage({
   params,
@@ -14,9 +15,10 @@ export default async function DirectionPage({
   const supabase = await createClient();
   const [{ data }, { data: biz }] = await Promise.all([
     supabase.from("direction").select("*").eq("business_id", id).maybeSingle(),
-    supabase.from("businesses").select("currency, stage").eq("id", id).single(),
+    supabase.from("businesses").select("currency, stage, model").eq("id", id).single(),
   ]);
   const currency = biz?.currency ?? "GBP";
+  const guide = guidanceFor(biz?.model);
 
   return (
     <div className="max-w-3xl">
@@ -66,7 +68,7 @@ export default async function DirectionPage({
             </div>
             <div>
               <label className="label" htmlFor="mid_term_size">Size</label>
-              <input className="input" id="mid_term_size" name="mid_term_size" placeholder="e.g. 1,200 beds" defaultValue={data?.mid_term_size ?? ""} />
+              <input className="input" id="mid_term_size" name="mid_term_size" placeholder={guide.size} defaultValue={data?.mid_term_size ?? ""} />
             </div>
           </div>
           <div className="mt-4">

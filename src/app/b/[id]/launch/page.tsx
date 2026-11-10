@@ -8,6 +8,7 @@ import {
   updateMilestone,
 } from "../actions";
 import Notice from "@/components/Notice";
+import { guidanceFor } from "@/lib/guidance";
 
 const statusColour: Record<string, string> = {
   proven: "bg-[#e5f4e4]",
@@ -31,9 +32,10 @@ export default async function LaunchPage({
   const [{ data: assumptions }, { data: milestones }, { data: biz }] = await Promise.all([
     supabase.from("assumptions").select("*").eq("business_id", id).order("rank"),
     supabase.from("milestones").select("*").eq("business_id", id).order("sequence"),
-    supabase.from("businesses").select("currency").eq("id", id).single(),
+    supabase.from("businesses").select("currency, model").eq("id", id).single(),
   ]);
   const currency = biz?.currency ?? "GBP";
+  const guide = guidanceFor(biz?.model);
 
   return (
     <div>
@@ -80,7 +82,7 @@ export default async function LaunchPage({
           <input type="hidden" name="business_id" value={id} />
           <div className="sm:col-span-2">
             <label className="label" htmlFor="assumption">New assumption</label>
-            <input className="input" id="assumption" name="assumption" required placeholder="e.g. We can lease 3-bed houses for under 9,000 kr a month" />
+            <input className="input" id="assumption" name="assumption" required placeholder={guide.assumption} />
           </div>
           <div>
             <label className="label" htmlFor="why_it_matters">Why it matters</label>
@@ -106,7 +108,7 @@ export default async function LaunchPage({
           {(milestones ?? []).length === 0 && (
             <form action={loadStandardMilestones}>
               <input type="hidden" name="business_id" value={id} />
-              <button className="btn btn-secondary">Load the six standard milestones</button>
+              <button className="btn btn-secondary">Load the standard milestones for this type of business</button>
             </form>
           )}
         </div>

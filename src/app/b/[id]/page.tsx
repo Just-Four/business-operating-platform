@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { PARTS, STAGES, STATE_LABELS, type Stage } from "@/lib/framework";
+import { MODELS, PARTS, STAGES, STATE_LABELS, type Stage } from "@/lib/framework";
 import { getProgress } from "@/lib/progress";
 import { updateStage } from "./actions";
 import Notice from "@/components/Notice";
@@ -29,7 +29,7 @@ export default async function BusinessOverview({
   const { id } = await params;
   const { error, saved } = await searchParams;
   const supabase = await createClient();
-  const { data: biz } = await supabase.from("businesses").select("name, stage").eq("id", id).single();
+  const { data: biz } = await supabase.from("businesses").select("name, stage, model").eq("id", id).single();
   const stage = (biz?.stage ?? "launch") as Stage;
   const progress = await getProgress(supabase, id);
   const stageIndex = ORDER.indexOf(stage);
@@ -67,8 +67,18 @@ export default async function BusinessOverview({
 
         <form action={updateStage} className="mt-3 flex flex-wrap items-center gap-2">
           <input type="hidden" name="business_id" value={id} />
-          <label htmlFor="stage" className="hint">
-            Move to stage
+          <label htmlFor="model" className="hint">
+            Type of business
+          </label>
+          <select className="input w-auto py-1.5" id="model" name="model" defaultValue={biz?.model ?? "other"}>
+            {Object.entries(MODELS).map(([k, v]) => (
+              <option key={k} value={k}>
+                {v}
+              </option>
+            ))}
+          </select>
+          <label htmlFor="stage" className="hint ml-2">
+            Stage
           </label>
           <select className="input w-auto py-1.5" id="stage" name="stage" defaultValue={stage}>
             {ORDER.map((s) => (
@@ -77,7 +87,7 @@ export default async function BusinessOverview({
               </option>
             ))}
           </select>
-          <button className="btn btn-secondary py-1.5">Change stage</button>
+          <button className="btn btn-secondary py-1.5">Update</button>
         </form>
       </section>
 

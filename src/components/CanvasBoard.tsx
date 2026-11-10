@@ -39,6 +39,8 @@ export default function CanvasBoard({
   businessId,
   initial,
   evidence,
+  examples,
+  evidenceExample,
   action,
   addEvidence,
   deleteEvidence,
@@ -46,6 +48,8 @@ export default function CanvasBoard({
   businessId: string;
   initial: Record<string, string>;
   evidence: EvidenceItem[];
+  examples: Record<string, string>;
+  evidenceExample: string;
   action: (formData: FormData) => void | Promise<void>;
   addEvidence: EvAction;
   deleteEvidence: EvAction;
@@ -114,7 +118,7 @@ export default function CanvasBoard({
                 <AutoTextarea
                   id={`${box.key}_answer`}
                   name={`${box.key}_answer`}
-                  placeholder="Write your answer here"
+                  placeholder={examples[box.key] ?? "Write your answer here"}
                   className="tile-area"
                   value={answers[box.key]}
                   onChange={(e) => {
@@ -155,6 +159,7 @@ export default function CanvasBoard({
           onClose={close}
           addAction={addEvidence}
           deleteAction={deleteEvidence}
+          summaryExample={evidenceExample}
         />
       )}
     </>

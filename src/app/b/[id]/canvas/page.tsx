@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { addEvidence, deleteEvidence, saveCanvas } from "../actions";
 import Notice from "@/components/Notice";
 import CanvasBoard from "@/components/CanvasBoard";
+import { guidanceFor } from "@/lib/guidance";
 
 export default async function CanvasPage({
   params,
@@ -13,7 +14,7 @@ export default async function CanvasPage({
   const { id } = await params;
   const { error, saved } = await searchParams;
   const supabase = await createClient();
-  const [{ data }, { data: evidence }] = await Promise.all([
+  const [{ data }, { data: evidence }, { data: biz }] = await Promise.all([
     supabase.from("canvas_boxes").select("box, answer").eq("business_id", id),
     supabase
       .from("evidence")
@@ -21,7 +22,9 @@ export default async function CanvasPage({
       .eq("business_id", id)
       .eq("subject_type", "canvas")
       .order("evidence_date", { ascending: false }),
+    supabase.from("businesses").select("model").eq("id", id).single(),
   ]);
+  const guide = guidanceFor(biz?.model);
   const initial: Record<string, string> = {};
   for (const r of data ?? []) initial[r.box] = r.answer ?? "";
 
@@ -41,6 +44,8 @@ export default async function CanvasPage({
           businessId={id}
           initial={initial}
           evidence={evidence ?? []}
+          examples={guide.canvas}
+          evidenceExample={guide.evidence}
           action={saveCanvas}
           addEvidence={addEvidence}
           deleteEvidence={deleteEvidence}

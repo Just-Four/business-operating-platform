@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { CANVAS_BOXES, STANDARD_MILESTONES } from "@/lib/framework";
+import { CANVAS_BOXES } from "@/lib/framework";
+import { guidanceFor } from "@/lib/guidance";
 
 function str(formData: FormData, key: string) {
   const v = formData.get(key);
@@ -27,10 +28,10 @@ function done(businessId: string, page: string, error?: string) {
 export async function updateStage(formData: FormData) {
   const businessId = String(formData.get("business_id"));
   const supabase = await createClient();
-  const { error } = await supabase
-    .from("businesses")
-    .update({ stage: String(formData.get("stage")) })
-    .eq("id", businessId);
+  const update: Record<string, string> = { stage: String(formData.get("stage")) };
+  const model = formData.get("model");
+  if (model) update.model = String(model);
+  const { error } = await supabase.from("businesses").update(update).eq("id", businessId);
   done(businessId, "", error?.message);
 }
 
@@ -143,8 +144,9 @@ export async function addMilestone(formData: FormData) {
 export async function loadStandardMilestones(formData: FormData) {
   const businessId = String(formData.get("business_id"));
   const supabase = await createClient();
+  const { data: biz } = await supabase.from("businesses").select("model").eq("id", businessId).single();
   const { error } = await supabase.from("milestones").insert(
-    STANDARD_MILESTONES.map((m, i) => ({
+    guidanceFor(biz?.model).milestones.map((m, i) => ({
       business_id: businessId,
       sequence: i + 1,
       name: m.name,

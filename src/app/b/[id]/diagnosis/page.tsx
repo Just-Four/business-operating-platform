@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { saveDiagnosis } from "../actions";
 import Notice from "@/components/Notice";
+import { guidanceFor } from "@/lib/guidance";
 
 export default async function DiagnosisPage({
   params,
@@ -12,6 +13,8 @@ export default async function DiagnosisPage({
   const { id } = await params;
   const { error, saved } = await searchParams;
   const supabase = await createClient();
+  const { data: biz } = await supabase.from("businesses").select("model").eq("id", id).single();
+  const guide = guidanceFor(biz?.model);
   const { data } = await supabase
     .from("diagnoses")
     .select("id, diagnosis, guiding_policy, coordinated_actions, reviewed_on")
@@ -37,7 +40,7 @@ export default async function DiagnosisPage({
         <div className="card p-4">
           <label className="label" htmlFor="diagnosis">Diagnosis</label>
           <p className="hint mb-2">
-            What is the single biggest challenge right now? Be specific: &quot;we have contracts but can&apos;t secure beds fast enough&quot;, not &quot;growth&quot;.
+            What is the single biggest challenge right now? Be specific, for example {guide.diagnosis}
           </p>
           <textarea className="input" id="diagnosis" name="diagnosis" rows={3} defaultValue={data?.diagnosis ?? ""} />
         </div>

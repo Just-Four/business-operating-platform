@@ -24,7 +24,7 @@ export const SESSIONS: Session[] = [
     minutes: 20,
     why: "A plan turns the hundred decisions you'd otherwise make in a panic into a few you make once, calmly, in advance. It also gives you a fair way to judge yourself: against what you said you'd do, not against how the week felt.",
     skipCost: "Without a commitment to dates, planning slips behind the day-to-day and never gets finished. Most plans that fail were never completed.",
-    output: "Session dates in your calendar and a date for the chairman to sign the plan off.",
+    output: "Session dates in your calendar and a date to have the plan signed off.",
     built: true,
   },
   {
@@ -73,9 +73,9 @@ export const SESSIONS: Session[] = [
   {
     key: "checkpoint_1",
     seq: 6,
-    title: "Chairman checkpoint",
+    title: "Get it challenged",
     minutes: 45,
-    why: "A second pair of eyes catches what you can't see from inside the business. The chairman's job here is to challenge, not approve: is this really who pays, and is that really the biggest obstacle?",
+    why: "A second pair of eyes catches what you can't see from inside the business. The point is to be challenged, not approved: is this really who pays, and is that really the biggest obstacle? Run it past someone you trust, or have the AI review it.",
     skipCost: "Errors in the business model or diagnosis flow into every target that follows.",
     output: "Business model and diagnosis challenged and agreed.",
     checkpoint: true,
@@ -107,7 +107,7 @@ export const SESSIONS: Session[] = [
   { key: "numbers", seq: 10, title: "The numbers", minutes: 60, why: "Turn the battles into money: what's likely, what you'll promise, and what's possible.", skipCost: "", output: "Budget, Commit and Stretch, with a stress test.", built: false },
   { key: "quarter", seq: 11, title: "This quarter, and how you'll know", minutes: 45, why: "A year is too long to steer by. Quarters and weekly numbers tell you early when you're drifting.", skipCost: "", output: "Quarterly priorities and scorecards.", built: false },
   { key: "roles", seq: 12, title: "Who does what", minutes: 45, why: "Every target needs one owner, whether that's a person, an automation or an AI.", skipCost: "", output: "Role cards.", built: false },
-  { key: "sign_off", seq: 13, title: "Chairman sign-off", minutes: 60, why: "Targets are agreed, not issued.", skipCost: "", output: "Targets argued and agreed.", checkpoint: true, built: false },
+  { key: "sign_off", seq: 13, title: "Final review and sign-off", minutes: 60, why: "Targets are agreed, not issued.", skipCost: "", output: "Targets argued and agreed.", checkpoint: true, built: false },
   { key: "lock", seq: 14, title: "Lock the plan", minutes: 20, why: "A locked budget gives you something fair to measure against all year.", skipCost: "", output: "Plan approved and the weekly rhythm started.", built: false },
 ];
 

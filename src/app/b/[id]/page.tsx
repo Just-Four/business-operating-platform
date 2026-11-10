@@ -12,7 +12,7 @@ const ORDER: Stage[] = ["launch", "early_revenue", "established"];
 const GROUPS = [
   { title: "Plan", text: "What the business is, where it's going, and this year's and this quarter's targets.", parts: [1, 2, 3, 4, 5, 6] },
   { title: "Run", text: "Who does the work, how it's measured, and how it's routed.", parts: [7, 8] },
-  { title: "Review", text: "The rhythm that checks the plan, and the chairman's monthly review.", parts: [9, 10] },
+  { title: "Review", text: "The rhythm that checks the plan, and the monthly review.", parts: [9, 10] },
 ];
 
 const STATE_TAG: Record<string, { tone: string; text: string }> = {

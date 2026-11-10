@@ -48,7 +48,7 @@ export default async function PortfolioPage({
               <Link key={b.id} href={`/b/${b.id}`} className="card block p-5 hover:border-[#2f5d50]">
                 <div className="flex items-start justify-between">
                   <h2 className="text-lg font-semibold">{b.name}</h2>
-                  {myRole && <span className="rounded bg-[#e7f1fb] px-2 py-0.5 text-xs capitalize">{myRole}</span>}
+                  {myRole && <span className="rounded bg-[#e7f1fb] px-2 py-0.5 text-xs">{({ chairman: "Owner", operator: "Operator", team_member: "Team", viewer: "Viewer" } as Record<string, string>)[myRole] ?? myRole}</span>}
                 </div>
                 <p className="hint mt-1">
                   {[b.sector || MODELS[b.model], STAGES[b.stage as Stage], b.country].filter(Boolean).join(", ")}
@@ -73,7 +73,7 @@ export default async function PortfolioPage({
 
         <section className="card mt-10 max-w-2xl p-6">
           <h2 className="text-lg font-semibold">Add a business</h2>
-          <p className="hint mb-4">You become its chairman. A few quick questions come next to set up the plan.</p>
+          <p className="hint mb-4">A few quick questions come next to set up the plan.</p>
           <form action={createBusiness} className="grid gap-4 sm:grid-cols-2">
             <div className="sm:col-span-2">
               <label className="label" htmlFor="name">Name</label>

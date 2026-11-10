@@ -318,27 +318,26 @@ export async function finishSession(formData: FormData) {
   redirect(await completeSessionInternal(supabase, businessId, String(formData.get("session_key"))));
 }
 
-export async function approveCheckpoint(formData: FormData) {
+export async function recordReview(formData: FormData) {
   const businessId = String(formData.get("business_id"));
   const key = String(formData.get("session_key"));
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  const { data: me } = await supabase
-    .from("memberships")
-    .select("role")
-    .eq("business_id", businessId)
-    .eq("user_id", user?.id ?? "")
-    .maybeSingle();
-  if (me?.role !== "chairman") {
-    redirect(`/b/${businessId}/s/${key}?error=${encodeURIComponent("Only the chairman can approve a checkpoint.")}`);
-  }
-  await supabase
+  const { error } = await supabase
     .from("programme_sessions")
-    .update({ approved_at: new Date().toISOString(), approved_by: user?.id ?? null })
+    .update({
+      approved_at: new Date().toISOString(),
+      approved_by: user?.id ?? null,
+      review_type: "person",
+      reviewer_name: str(formData, "reviewer_name"),
+      reviewer_role: str(formData, "reviewer_role"),
+      review_notes: str(formData, "review_notes"),
+    })
     .eq("business_id", businessId)
     .eq("key", key);
+  if (error) redirect(`/b/${businessId}/s/${key}?error=${encodeURIComponent(error.message)}`);
   revalidatePath(`/b/${businessId}`, "layout");
   redirect(await completeSessionInternal(supabase, businessId, key));
 }

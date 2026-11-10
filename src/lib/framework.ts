@@ -112,7 +112,7 @@ export const PARTS: Part[] = [
   {
     num: 10,
     slug: "reviews",
-    title: "Chairman review",
+    title: "Monthly review",
     summary: "The monthly written review, decisions and actions.",
     built: false,
     stages: { launch: "on", early_revenue: "on", established: "on" },

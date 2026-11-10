@@ -79,7 +79,7 @@ export default async function ProgrammePage({
                   </Link>
                   <span className="hint block">
                     About {s.minutes} min
-                    {s.checkpoint ? (r?.approved_at ? ", approved by the chairman" : ", chairman checkpoint") : ""}
+                    {s.checkpoint ? (r?.approved_at ? ", reviewed" : ", review checkpoint") : ""}
                   </span>
                 </span>
                 <input
@@ -98,8 +98,8 @@ export default async function ProgrammePage({
 
         <div className="card mt-6 grid gap-4 p-5 sm:grid-cols-[1fr_auto] sm:items-end">
           <div>
-            <label className="label" htmlFor="sign_off_date">Chairman sign-off date</label>
-            <p className="hint mb-2">The day the plan is agreed. Sessions are spread to finish before it.</p>
+            <label className="label" htmlFor="sign_off_date">Sign-off date</label>
+            <p className="hint mb-2">The day the plan is finished and agreed. Sessions are spread to finish by then.</p>
             <input id="sign_off_date" name="sign_off_date" type="date" className="input w-auto" defaultValue={biz?.sign_off_date ?? ""} />
           </div>
           <div className="flex flex-wrap gap-2">
@@ -113,7 +113,7 @@ export default async function ProgrammePage({
         </div>
         {!committed && (
           <p className="hint mt-2">
-            Committing puts the dates on record for the chairman. Add them to your calendar now, as you would a meeting
+            Committing puts the dates on record. Add them to your calendar now, as you would a meeting
             you can&apos;t miss.
           </p>
         )}

@@ -1,103 +1,120 @@
-import Image from "next/image";
+import Link from "next/link";
+import { createClient } from "@/lib/supabase/server";
+import TopBar from "@/components/TopBar";
+import { createBusiness } from "./actions";
+import { MODELS, STAGES, type Stage } from "@/lib/framework";
 
-export default function Home() {
+export default async function PortfolioPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string }>;
+}) {
+  const { error } = await searchParams;
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const { data: businesses } = await supabase
+    .from("businesses")
+    .select("id, name, model, stage, country, currency, memberships(role, user_id)")
+    .order("name");
+
+  const ids = (businesses ?? []).map((b) => b.id);
+  const [{ data: milestones }, { data: canvas }] = await Promise.all([
+    supabase.from("milestones").select("business_id, status").in("business_id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"]),
+    supabase.from("canvas_boxes").select("business_id, answer").in("business_id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"]),
+  ]);
+
   return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
-
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+    <>
+      <TopBar email={user?.email} />
+      <main className="mx-auto max-w-7xl px-6 py-8">
+        <div className="mb-6">
+          <h1 className="text-2xl font-semibold">Portfolio</h1>
+          <p className="hint">Every business you chair or run, on one page.</p>
         </div>
+
+        {error && <p className="mb-4 rounded bg-red-50 p-3 text-sm text-red-800">{error}</p>}
+
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {(businesses ?? []).map((b) => {
+            const myRole = (b.memberships ?? []).find((m: { user_id: string }) => m.user_id === user?.id)?.role;
+            const ms = (milestones ?? []).filter((m) => m.business_id === b.id);
+            const met = ms.filter((m) => m.status === "met").length;
+            const filled = (canvas ?? []).filter((c) => c.business_id === b.id && c.answer && String(c.answer).trim()).length;
+            return (
+              <Link key={b.id} href={`/b/${b.id}`} className="card block p-5 hover:border-[#2f5d50]">
+                <div className="flex items-start justify-between">
+                  <h2 className="text-lg font-semibold">{b.name}</h2>
+                  {myRole && <span className="rounded bg-[#e7f1fb] px-2 py-0.5 text-xs capitalize">{myRole}</span>}
+                </div>
+                <p className="hint mt-1">
+                  {MODELS[b.model] ?? b.model} · {STAGES[b.stage as Stage]}
+                  {b.country ? ` · ${b.country}` : ""}
+                </p>
+                <dl className="mt-4 grid grid-cols-2 gap-2 text-sm">
+                  <div>
+                    <dt className="hint">Business model</dt>
+                    <dd className="font-medium">{filled}/9 boxes</dd>
+                  </div>
+                  <div>
+                    <dt className="hint">Launch milestones</dt>
+                    <dd className="font-medium">{ms.length ? `${met}/${ms.length} met` : "Not set"}</dd>
+                  </div>
+                </dl>
+              </Link>
+            );
+          })}
+          {(businesses ?? []).length === 0 && (
+            <p className="hint">No businesses yet. Add the first one below.</p>
+          )}
+        </div>
+
+        <section className="card mt-10 max-w-2xl p-6">
+          <h2 className="text-lg font-semibold">Add a business</h2>
+          <p className="hint mb-4">You become its chairman. Invite the operator once it&apos;s set up.</p>
+          <form action={createBusiness} className="grid gap-4 sm:grid-cols-2">
+            <div className="sm:col-span-2">
+              <label className="label" htmlFor="name">Name</label>
+              <input className="input" id="name" name="name" required />
+            </div>
+            <div>
+              <label className="label" htmlFor="model">Business model</label>
+              <select className="input" id="model" name="model" defaultValue="workforce_accommodation">
+                {Object.entries(MODELS).map(([k, v]) => (
+                  <option key={k} value={k}>{v}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="label" htmlFor="stage">Stage</label>
+              <select className="input" id="stage" name="stage" defaultValue="launch">
+                {Object.entries(STAGES).map(([k, v]) => (
+                  <option key={k} value={k}>{v}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="label" htmlFor="country">Country</label>
+              <input className="input" id="country" name="country" />
+            </div>
+            <div>
+              <label className="label" htmlFor="currency">Currency</label>
+              <select className="input" id="currency" name="currency" defaultValue="GBP">
+                <option value="GBP">GBP (£)</option>
+                <option value="SEK">SEK (kr)</option>
+                <option value="EUR">EUR (€)</option>
+                <option value="NOK">NOK (kr)</option>
+                <option value="DKK">DKK (kr)</option>
+              </select>
+            </div>
+            <div className="sm:col-span-2">
+              <button className="btn">Add business</button>
+            </div>
+          </form>
+        </section>
       </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+    </>
   );
 }

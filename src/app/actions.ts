@@ -13,7 +13,7 @@ export async function createBusiness(formData: FormData) {
     name: String(formData.get("name") ?? "").trim(),
     model: String(formData.get("model") ?? "other"),
     sector: String(formData.get("sector") ?? "").trim() || null,
-    stage: String(formData.get("stage") ?? "launch"),
+    stage: "launch",
     country: String(formData.get("country") ?? "").trim() || null,
     currency: String(formData.get("currency") ?? "GBP"),
   });

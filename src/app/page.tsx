@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import TopBar from "@/components/TopBar";
+import CountryCurrency from "@/components/CountryCurrency";
 import { createBusiness } from "./actions";
 import { MODELS, STAGES, type Stage } from "@/lib/framework";
 
@@ -72,7 +73,7 @@ export default async function PortfolioPage({
 
         <section className="card mt-10 max-w-2xl p-6">
           <h2 className="text-lg font-semibold">Add a business</h2>
-          <p className="hint mb-4">You become its chairman. Invite the operator once it&apos;s set up.</p>
+          <p className="hint mb-4">You become its chairman. A few quick questions come next to set up the plan.</p>
           <form action={createBusiness} className="grid gap-4 sm:grid-cols-2">
             <div className="sm:col-span-2">
               <label className="label" htmlFor="name">Name</label>
@@ -82,36 +83,7 @@ export default async function PortfolioPage({
               <label className="label" htmlFor="sector">Sector</label>
               <input className="input" id="sector" name="sector" placeholder="e.g. Childcare, IT support, Accommodation" />
             </div>
-            <div>
-              <label className="label" htmlFor="model">How it makes money</label>
-              <select className="input" id="model" name="model" defaultValue="other">
-                {Object.entries(MODELS).map(([k, v]) => (
-                  <option key={k} value={k}>{v}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="label" htmlFor="stage">Stage</label>
-              <select className="input" id="stage" name="stage" defaultValue="launch">
-                {Object.entries(STAGES).map(([k, v]) => (
-                  <option key={k} value={k}>{v}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="label" htmlFor="country">Country</label>
-              <input className="input" id="country" name="country" />
-            </div>
-            <div>
-              <label className="label" htmlFor="currency">Currency</label>
-              <select className="input" id="currency" name="currency" defaultValue="GBP">
-                <option value="GBP">GBP (£)</option>
-                <option value="SEK">SEK (kr)</option>
-                <option value="EUR">EUR (€)</option>
-                <option value="NOK">NOK (kr)</option>
-                <option value="DKK">DKK (kr)</option>
-              </select>
-            </div>
+            <CountryCurrency />
             <div className="sm:col-span-2">
               <button className="btn">Add business</button>
             </div>

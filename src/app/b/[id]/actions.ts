@@ -489,7 +489,8 @@ export async function saveReadings(formData: FormData) {
     if (!s) continue;
     const n = Number(s.replace(/[, ]/g, ""));
     if (!Number.isFinite(n)) continue;
-    rows.push({ business_id: businessId, measure_id: k.slice(8), period_start: period, value: n, recorded_by: user?.id ?? null, source: "manual" });
+    const [mid, own] = k.slice(8).split("__");
+    rows.push({ business_id: businessId, measure_id: mid, period_start: own && /^\d{4}-\d{2}-\d{2}$/.test(own) ? own : period, value: n, recorded_by: user?.id ?? null, source: "manual" });
   }
   const { error } = rows.length
     ? await supabase.from("measure_readings").upsert(rows, { onConflict: "measure_id,period_start" })

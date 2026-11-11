@@ -50,20 +50,37 @@ export default async function ScorecardsPage({
   const [{ data: roles }, { data: measures }, { data: readings }] = await Promise.all([
     supabase.from("roles").select("id, name, filled_by").eq("business_id", id).eq("active", true).order("created_at"),
     supabase.from("measures").select("*").eq("business_id", id).eq("active", true).order("updated_at"),
-    supabase.from("measure_readings").select("measure_id, period_start, value").eq("business_id", id).gte("period_start", weeks[0]).lte("period_start", week),
+    supabase.from("measure_readings").select("measure_id, period_start, value").eq("business_id", id).gte("period_start", shift(week, -1500)).lte("period_start", week),
   ]);
   const ms = (measures ?? []) as Measure[];
   const val = (m: string, w: string) => readings?.find((r) => r.measure_id === m && r.period_start === w)?.value as number | undefined;
 
-  const status = ms.map((m) => ({ m, rag: ragOf(val(m.id, week), m.target, m.better_when) }));
+  // Measures counted by the month, quarter or year have their own periods.
+  const periodStart = (per: string, back = 0) => {
+    const d = new Date(`${week}T00:00:00Z`);
+    if (per === "month") return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() - back, 1)).toISOString().slice(0, 10);
+    if (per === "quarter") return new Date(Date.UTC(d.getUTCFullYear(), Math.floor(d.getUTCMonth() / 3) * 3 - back * 3, 1)).toISOString().slice(0, 10);
+    if (per === "year") return new Date(Date.UTC(d.getUTCFullYear() - back, 0, 1)).toISOString().slice(0, 10);
+    return shift(week, -7 * back);
+  };
+  const periodLabel = (per: string, start: string) => {
+    const d = new Date(`${start}T00:00:00Z`);
+    if (per === "month") return d.toLocaleDateString("en-GB", { month: "short", year: "numeric", timeZone: "UTC" });
+    if (per === "quarter") return `${d.toLocaleDateString("en-GB", { month: "short", timeZone: "UTC" })} quarter ${d.getUTCFullYear()}`;
+    if (per === "year") return String(d.getUTCFullYear());
+    return short(start);
+  };
+  const weekly = ms.filter((m) => m.target_period === "week");
+  const longer = ms.filter((m) => m.target_period !== "week");
+  const status = ms.map((m) => ({ m, rag: ragOf(val(m.id, periodStart(m.target_period)), m.target, m.better_when) }));
   const red = status.filter((s) => s.rag === "red");
   const amber = status.filter((s) => s.rag === "amber");
   const missing = status.filter((s) => s.rag === "none");
   const roleName = (rid: string | null) => roles?.find((r) => r.id === rid)?.name ?? "Whole business";
 
   const groups = [
-    ...(roles ?? []).map((r) => ({ key: r.id, title: r.name, sub: r.filled_by || "Vacant", items: ms.filter((m) => m.role_id === r.id) })),
-    { key: "none", title: "Whole business", sub: "Not tied to one role", items: ms.filter((m) => !m.role_id) },
+    ...(roles ?? []).map((r) => ({ key: r.id, title: r.name, sub: r.filled_by || "Vacant", items: weekly.filter((m) => m.role_id === r.id) })),
+    { key: "none", title: "Whole business", sub: "Not tied to one role", items: weekly.filter((m) => !m.role_id) },
   ].filter((g) => g.items.length);
 
   return (
@@ -96,7 +113,7 @@ export default async function ScorecardsPage({
           </div>
           <div className="card p-4" style={{ borderLeft: "6px solid var(--line)" }}>
             <p className="display text-3xl font-bold">{missing.length}</p>
-            <p className="font-semibold">Not entered this week</p>
+            <p className="font-semibold">Not entered yet</p>
             <p className="hint">
               {missing.length === 0
                 ? "All in"
@@ -186,7 +203,67 @@ export default async function ScorecardsPage({
               </table>
             </section>
           ))}
-          <button className="btn">Save this week&apos;s numbers</button>
+          {longer.length > 0 && (
+            <section className="card overflow-x-auto p-0">
+              <div className="border-b border-[var(--line)] p-4">
+                <h2 className="display text-xl font-bold">Counted by the month, quarter or year</h2>
+                <p className="hint">These only need a number once per period. Enter it when the period closes, or update it as you go.</p>
+              </div>
+              <table className="w-full min-w-[720px] text-sm">
+                <thead>
+                  <tr className="text-left text-[var(--muted)]">
+                    <th className="px-4 py-2 font-medium">Measure</th>
+                    <th className="px-2 py-2 font-medium">Target</th>
+                    <th className="px-2 py-2 font-medium">Earlier</th>
+                    <th className="px-2 py-2 font-medium">Now</th>
+                    <th className="px-4 py-2 font-medium">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {longer.map((m) => {
+                    const cur = periodStart(m.target_period);
+                    const rag = ragOf(val(m.id, cur), m.target, m.better_when);
+                    return (
+                      <tr key={m.id} className="border-t border-[var(--line)]">
+                        <td className="px-4 py-3">
+                          <span className="font-semibold">{m.name}</span>
+                          <span className="hint block">
+                            {roleName(m.role_id)}, {m.kind === "lead" ? "lead" : "lag"}
+                            {m.better_when === "lower" ? ", lower is better" : ""}
+                            {m.data_source ? `, from ${m.data_source}` : ""}
+                          </span>
+                        </td>
+                        <td className="px-2 py-3 whitespace-nowrap">
+                          {fmt(m.target, m.unit)}
+                          <span className="hint"> a {m.target_period}</span>
+                        </td>
+                        <td className="px-2 py-3">
+                          {[2, 1].map((n) => {
+                            const p = periodStart(m.target_period, n);
+                            const r = ragOf(val(m.id, p), m.target, m.better_when);
+                            return (
+                              <span key={p} className="mr-4 inline-flex items-center gap-1.5 whitespace-nowrap">
+                                <span className="hint">{periodLabel(m.target_period, p)}</span> {fmt(val(m.id, p))}
+                                <span className="rag" data-rag={r} aria-hidden />
+                              </span>
+                            );
+                          })}
+                        </td>
+                        <td className="px-2 py-3">
+                          <label className="hint block" htmlFor={`r-${m.id}`}>{periodLabel(m.target_period, cur)}</label>
+                          <input className="input w-28" id={`r-${m.id}`} name={`reading_${m.id}__${cur}`} inputMode="decimal" defaultValue={val(m.id, cur) ?? ""} />
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="tag" data-tone={RAG_TONE[rag]}>{RAG_LABEL[rag]}</span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </section>
+          )}
+          <button className="btn">Save the numbers</button>
         </form>
       )}
 

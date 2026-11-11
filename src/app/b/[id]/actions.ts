@@ -128,9 +128,9 @@ export async function saveDiagnosis(formData: FormData) {
 export async function saveDirection(formData: FormData) {
   const businessId = String(formData.get("business_id"));
   const supabase = await createClient();
-  const capabilities = (str(formData, "capabilities") ?? "")
-    .split("\n")
-    .map((s) => s.trim())
+  const capabilities = formData
+    .getAll("capabilities")
+    .map((s) => String(s).replace(/\s+/g, " ").trim())
     .filter(Boolean);
   const { error } = await supabase.from("direction").upsert(
     {

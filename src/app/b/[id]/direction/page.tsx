@@ -80,9 +80,19 @@ export default async function DirectionPage({
             </div>
           </div>
           <div className="mt-4">
-            <label className="label" htmlFor="capabilities">Capabilities needed to get there</label>
-            <p className="hint mb-2">Three, one per line.</p>
-            <textarea className="input" id="capabilities" name="capabilities" rows={3} defaultValue={(data?.capabilities ?? []).join("\n")} />
+            <p className="label">Capabilities needed to get there</p>
+            <p className="hint mb-2">The three things the business must be able to do well. One in each box.</p>
+            <div className="space-y-3">
+              {Array.from({ length: Math.max(3, (data?.capabilities ?? []).length) }, (_, i) => (
+                <div key={i} className="grid grid-cols-[1.5rem_1fr] items-start gap-2">
+                  <label htmlFor={`capability_${i}`} className="display pt-2 text-lg font-bold text-[var(--muted)]">
+                    {i + 1}
+                    <span className="sr-only"> capability</span>
+                  </label>
+                  <textarea className="input" id={`capability_${i}`} name="capabilities" rows={2} defaultValue={(data?.capabilities ?? [])[i] ?? ""} />
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 

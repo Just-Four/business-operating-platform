@@ -11,8 +11,8 @@ export default async function UpcomingPart({ params }: { params: Promise<{ id: s
       <h1 className="text-4xl font-bold leading-none sm:text-5xl">{p.title}</h1>
       <p className="mt-3 text-[var(--muted)]">{p.summary}</p>
       <div className="card mt-6 p-6">
-        <p className="font-medium">This screen is in the next build.</p>
-        <p className="hint mt-1">The database tables for this part already exist, so nothing entered later will need moving.</p>
+        <p className="font-medium">This part isn&apos;t available yet.</p>
+        <p className="hint mt-1">It&apos;s being built. Nothing you&apos;ve entered elsewhere is affected, and you can carry on with the parts marked in the menu.</p>
       </div>
     </div>
   );

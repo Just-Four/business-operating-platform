@@ -9,6 +9,15 @@ export type BusinessProgress = {
 };
 
 export async function getProgress(supabase: SupabaseClient, id: string): Promise<BusinessProgress> {
+  const { data: cyc } = await supabase.from("plan_cycles").select("id").eq("business_id", id).order("start_date", { ascending: false }).limit(1).maybeSingle();
+  const [yb, yn] = cyc
+    ? await Promise.all([
+        supabase.from("must_win_battles").select("id").eq("plan_cycle_id", cyc.id),
+        supabase.from("financial_lines").select("id").eq("plan_cycle_id", cyc.id).eq("scenario", "budget").eq("measure", "revenue"),
+      ])
+    : [{ data: [] }, { data: [] }];
+  const nBattles = (yb.data ?? []).length;
+  const hasNumbers = (yn.data ?? []).length > 0;
   const [canvas, diag, dir, assumptions, milestones, ev] = await Promise.all([
     supabase.from("canvas_boxes").select("box, answer").eq("business_id", id),
     supabase
@@ -46,6 +55,7 @@ export async function getProgress(supabase: SupabaseClient, id: string): Promise
           : "empty",
     direction: r?.purpose && r?.mid_term_year ? "complete" : r?.purpose || r?.long_term_target ? "partial" : "empty",
     launch: a.length >= 3 && m.length > 0 ? "complete" : a.length || m.length ? "partial" : "empty",
+    year: nBattles > 0 && hasNumbers ? "complete" : cyc ? "partial" : "empty",
   };
 
   const detail: Record<string, string> = {
@@ -58,6 +68,7 @@ export async function getProgress(supabase: SupabaseClient, id: string): Promise
       a.length || m.length
         ? `${provenAssumptions} of ${a.length} assumptions proven, ${met} of ${m.length} milestones met`
         : "Not started",
+    year: cyc ? `${nBattles} Must-Win Battle${nBattles === 1 ? "" : "s"}, numbers ${hasNumbers ? "entered" : "not entered"}` : "Not started",
   };
 
   return { states, detail };

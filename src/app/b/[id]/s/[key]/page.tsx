@@ -10,6 +10,8 @@ import PendingButton from "@/components/PendingButton";
 import { RESPONSES, type CheckpointReview } from "@/lib/ai";
 
 export const maxDuration = 60;
+
+const PART_LABEL: Record<string, string> = { launch: "launch plan", direction: "direction", year: "This year" };
 import Notice from "@/components/Notice";
 import CanvasBoard from "@/components/CanvasBoard";
 
@@ -464,12 +466,12 @@ export default async function SessionPage({
         {session.part && key !== "diagnosis" && (
           <div className="card p-5">
             <p>
-              Work through the {session.part === "launch" ? "launch plan" : "direction"} screen, then come back here and
+              Work through the {PART_LABEL[session.part] ?? session.part} screen, then come back here and
               finish the session.
             </p>
             <div className="mt-4 flex flex-wrap gap-2">
-              <Link href={`/b/${id}/${session.part}?session=${key}`} className="btn btn-secondary">
-                Open the {session.part === "launch" ? "launch plan" : "direction"} screen
+              <Link href={`/b/${id}/${session.part}?session=${key}${key === "numbers" ? "#numbers" : key === "battles" ? "#battles" : ""}`} className="btn btn-secondary">
+                Open the {PART_LABEL[session.part] ?? session.part} screen
               </Link>
               <FinishForm id={id} sessionKey={key} />
             </div>

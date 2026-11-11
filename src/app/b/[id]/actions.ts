@@ -653,3 +653,222 @@ export async function acceptAiReview(formData: FormData) {
   revalidatePath(`/b/${businessId}`, "layout");
   redirect(await completeSessionInternal(supabase, businessId, key));
 }
+
+// ---------- Part 5: this year ----------
+
+function parseDate(s: string | null | undefined) {
+  if (!s) return null;
+  const t = s.trim();
+  let m = t.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (m) return `${m[1]}-${m[2].padStart(2, "0")}-${m[3].padStart(2, "0")}`;
+  m = t.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2,4})$/);
+  if (m) return `${m[3].length === 2 ? `20${m[3]}` : m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
+  return null;
+}
+
+function parseNum(s: string | null | undefined) {
+  if (!s) return null;
+  const n = Number(s.replace(/[^0-9.\-]/g, ""));
+  return s.replace(/[^0-9]/g, "").length && Number.isFinite(n) ? n : null;
+}
+
+function pick(s: string | null | undefined, options: string[]) {
+  const t = (s ?? "").trim().toLowerCase();
+  return options.find((o) => t.startsWith(o)) ?? null;
+}
+
+// Rows pasted from a table: one per line, columns separated by tabs (or " | ").
+function pastedRows(text: string | null, columns: number) {
+  return (text ?? "")
+    .split(/\r?\n/)
+    .map((line) => line.split(line.includes("\t") ? "\t" : "|").map((c) => c.trim()))
+    .filter((cells) => cells.some(Boolean))
+    .map((cells) => (cells.length > columns && /^#?\d*$/.test(cells[0]) ? cells.slice(1) : cells))
+    .filter((cells) => cells[0] && !/^(#|title|battle|must-win battle|source|risk)$/i.test(cells[0]));
+}
+
+export async function savePlanYear(formData: FormData) {
+  const businessId = String(formData.get("business_id"));
+  const id = str(formData, "id");
+  const supabase = await createClient();
+  const start = parseDate(str(formData, "start_date"));
+  if (!start) return done(formData, supabase, businessId, "year", "Choose the date the plan year starts.");
+  const e = new Date(`${start}T00:00:00Z`);
+  e.setUTCFullYear(e.getUTCFullYear() + 1);
+  e.setUTCDate(e.getUTCDate() - 1);
+  const row = {
+    business_id: businessId,
+    name: str(formData, "name") ?? `Year from ${start}`,
+    start_date: start,
+    end_date: e.toISOString().slice(0, 10),
+    runway_floor_months: num(formData, "runway_floor_months") ?? 3,
+  };
+  const { error } = id ? await supabase.from("plan_cycles").update(row).eq("id", id) : await supabase.from("plan_cycles").insert(row);
+  await done(formData, supabase, businessId, "year", error?.message);
+}
+
+export async function saveBattle(formData: FormData) {
+  const businessId = String(formData.get("business_id"));
+  const supabase = await createClient();
+  const cycle = String(formData.get("plan_cycle_id"));
+  const number = Number(formData.get("number"));
+  const title = str(formData, "title");
+  if (!title) return done(formData, supabase, businessId, "year", "Give the battle a name.");
+  const { error } = await supabase.from("must_win_battles").upsert(
+    {
+      business_id: businessId,
+      plan_cycle_id: cycle,
+      number,
+      title,
+      winning_looks_like: str(formData, "winning_looks_like"),
+      kpi: str(formData, "kpi"),
+      target: str(formData, "target"),
+      deadline: str(formData, "deadline"),
+      owner_role_id: str(formData, "owner_role_id"),
+      answers_diagnosis: str(formData, "answers_diagnosis"),
+      status: str(formData, "status") ?? "on_track",
+    },
+    { onConflict: "plan_cycle_id,number" }
+  );
+  await done(formData, supabase, businessId, "year", error?.message);
+}
+
+export async function removeBattle(formData: FormData) {
+  const businessId = String(formData.get("business_id"));
+  const supabase = await createClient();
+  const { error } = await supabase.from("must_win_battles").delete().eq("id", String(formData.get("id")));
+  await done(formData, supabase, businessId, "year", error?.message);
+}
+
+export async function addDemand(formData: FormData) {
+  const businessId = String(formData.get("business_id"));
+  const supabase = await createClient();
+  const { error } = await supabase.from("demand_sources").insert({
+    business_id: businessId,
+    plan_cycle_id: String(formData.get("plan_cycle_id")),
+    source: str(formData, "source") ?? "",
+    source_type: str(formData, "source_type") ?? "new",
+    starts_paying: str(formData, "starts_paying"),
+    monthly_value: num(formData, "monthly_value"),
+    ends_or_renews: str(formData, "ends_or_renews"),
+    confidence: str(formData, "confidence") ?? "speculative",
+    evidence: str(formData, "evidence"),
+  });
+  await done(formData, supabase, businessId, "year", error?.message);
+}
+
+export async function addRisk(formData: FormData) {
+  const businessId = String(formData.get("business_id"));
+  const supabase = await createClient();
+  const { error } = await supabase.from("risks").insert({
+    business_id: businessId,
+    risk: str(formData, "risk") ?? "",
+    early_warning: str(formData, "early_warning"),
+    response: str(formData, "response"),
+    likelihood: str(formData, "likelihood") ?? "medium",
+    impact: str(formData, "impact") ?? "medium",
+    owner_role_id: str(formData, "owner_role_id"),
+  });
+  await done(formData, supabase, businessId, "year", error?.message);
+}
+
+export async function updateRisk(formData: FormData) {
+  const businessId = String(formData.get("business_id"));
+  const supabase = await createClient();
+  const { error } = await supabase.from("risks").update({ status: String(formData.get("status")) }).eq("id", String(formData.get("id")));
+  await done(formData, supabase, businessId, "year", error?.message);
+}
+
+export async function removeYearRow(formData: FormData) {
+  const businessId = String(formData.get("business_id"));
+  const table = String(formData.get("table"));
+  const supabase = await createClient();
+  if (!["demand_sources", "risks"].includes(table)) return done(formData, supabase, businessId, "year", "Can't remove that.");
+  const { error } = await supabase.from(table).delete().eq("id", String(formData.get("id"))).eq("business_id", businessId);
+  await done(formData, supabase, businessId, "year", error?.message);
+}
+
+export async function saveNumbers(formData: FormData) {
+  const businessId = String(formData.get("business_id"));
+  const cycle = String(formData.get("plan_cycle_id"));
+  const month = String(formData.get("month"));
+  const supabase = await createClient();
+  const rows: { business_id: string; plan_cycle_id: string; scenario: string; month: string; measure: string; value: number; forecast_version: number }[] = [];
+  for (const [k, v] of formData.entries()) {
+    const m = k.match(/^n_(budget|commit|stretch)_([a-z_]+)$/);
+    if (!m) continue;
+    const n = parseNum(String(v));
+    if (n === null) continue;
+    rows.push({ business_id: businessId, plan_cycle_id: cycle, scenario: m[1], month, measure: m[2], value: n, forecast_version: 0 });
+  }
+  const { error } = rows.length
+    ? await supabase.from("financial_lines").upsert(rows, { onConflict: "plan_cycle_id,scenario,month,measure,forecast_version" })
+    : { error: null };
+  await done(formData, supabase, businessId, "year", error?.message);
+}
+
+export async function pasteYearRows(formData: FormData) {
+  const businessId = String(formData.get("business_id"));
+  const cycle = String(formData.get("plan_cycle_id"));
+  const kind = String(formData.get("kind"));
+  const text = str(formData, "rows");
+  const supabase = await createClient();
+  let error: string | undefined;
+  if (kind === "battles") {
+    const { data: existing } = await supabase.from("must_win_battles").select("number").eq("plan_cycle_id", cycle);
+    const free = [1, 2, 3].filter((n) => !(existing ?? []).some((b) => b.number === n));
+    const rows = pastedRows(text, 5).slice(0, free.length);
+    if (!rows.length) error = free.length ? "Nothing to add. Paste one battle per line." : "You already have three battles. Remove one first.";
+    else {
+      const r = await supabase.from("must_win_battles").insert(
+        rows.map((c, i) => ({
+          business_id: businessId,
+          plan_cycle_id: cycle,
+          number: free[i],
+          title: c[0],
+          winning_looks_like: c[1] || null,
+          kpi: c[2] || null,
+          target: c[3] || null,
+          deadline: parseDate(c[4]),
+        }))
+      );
+      error = r.error?.message;
+    }
+  } else if (kind === "demand") {
+    const rows = pastedRows(text, 7);
+    if (!rows.length) error = "Nothing to add. Paste one source per line.";
+    else {
+      const r = await supabase.from("demand_sources").insert(
+        rows.map((c) => ({
+          business_id: businessId,
+          plan_cycle_id: cycle,
+          source: c[0],
+          source_type: pick(c[1], ["existing", "renewal", "new"]) ?? "new",
+          starts_paying: parseDate(c[2]),
+          monthly_value: parseNum(c[3]),
+          ends_or_renews: parseDate(c[4]),
+          confidence: pick(c[5], ["confirmed", "likely", "speculative"]) ?? "speculative",
+          evidence: c[6] || null,
+        }))
+      );
+      error = r.error?.message;
+    }
+  } else if (kind === "risks") {
+    const rows = pastedRows(text, 5);
+    if (!rows.length) error = "Nothing to add. Paste one risk per line.";
+    else {
+      const r = await supabase.from("risks").insert(
+        rows.map((c) => ({
+          business_id: businessId,
+          risk: c[0],
+          early_warning: c[1] || null,
+          response: c[2] || null,
+          likelihood: pick(c[3], ["high", "medium", "low"]) ?? "medium",
+          impact: pick(c[4], ["high", "medium", "low"]) ?? "medium",
+        }))
+      );
+      error = r.error?.message;
+    }
+  }
+  await done(formData, supabase, businessId, "year", error);
+}

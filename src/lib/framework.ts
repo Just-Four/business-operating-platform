@@ -73,8 +73,8 @@ export const PARTS: Part[] = [
     num: 5,
     slug: "year",
     title: "This year",
-    summary: "Look back, demand map, Must-Win Battles, numbers, three cases, team, risks.",
-    built: false,
+    summary: "Must-Win Battles, where sales will come from, the numbers in three cases, team, risks.",
+    built: true,
     stages: { launch: "reduced", early_revenue: "on", established: "on" },
   },
   {

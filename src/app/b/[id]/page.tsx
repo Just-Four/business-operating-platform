@@ -133,7 +133,7 @@ export default async function BusinessOverview({
               const s = p.stages[stage];
               const prog = progress.states[p.slug];
               const tag = !p.built
-                ? { tone: "quiet", text: "Next build" }
+                ? { tone: "quiet", text: "Not available yet" }
                 : s === "off"
                   ? { tone: "quiet", text: "Not used at this stage" }
                   : STATE_TAG[prog ?? "empty"];

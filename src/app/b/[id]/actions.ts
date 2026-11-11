@@ -698,7 +698,7 @@ export async function savePlanYear(formData: FormData) {
   e.setUTCDate(e.getUTCDate() - 1);
   const row = {
     business_id: businessId,
-    name: str(formData, "name") ?? `Year from ${start}`,
+    name: str(formData, "name") ?? `12 months from ${new Date(`${start}T00:00:00Z`).toLocaleDateString("en-GB", { month: "long", year: "numeric", timeZone: "UTC" })}`,
     start_date: start,
     end_date: e.toISOString().slice(0, 10),
     runway_floor_months: num(formData, "runway_floor_months") ?? 3,

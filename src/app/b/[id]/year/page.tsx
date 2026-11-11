@@ -181,35 +181,67 @@ export default async function YearPage({
       </p>
 
       {/* Plan year */}
-      <section className="card mt-6 p-5">
-        <h2 className="display text-xl font-bold">The plan year</h2>
-        <form action={savePlanYear} className="mt-3 grid gap-4 sm:grid-cols-[1fr_12rem_12rem_auto] sm:items-end">
-          <input type="hidden" name="business_id" value={id} />
-          <input type="hidden" name="return_to" value={back} />
-          {cycle && <input type="hidden" name="id" value={cycle.id} />}
-          <div>
-            <label className="label" htmlFor="name">Name</label>
-            <input className="input" id="name" name="name" defaultValue={cycle?.name ?? ""} placeholder="2027 plan" />
-          </div>
-          <div>
-            <label className="label" htmlFor="start_date">Starts</label>
-            <input className="input" id="start_date" name="start_date" type="date" required defaultValue={cycle?.start_date ?? ""} />
-          </div>
-          <div>
-            <label className="label" htmlFor="runway_floor_months">Cash floor (months)</label>
-            <input className="input" id="runway_floor_months" name="runway_floor_months" inputMode="decimal" defaultValue={cycle?.runway_floor_months ?? 3} />
-          </div>
-          <button className={cycle ? "btn btn-secondary" : "btn"}>{cycle ? "Save" : "Set the plan year"}</button>
-        </form>
-        <p className="hint mt-2">
-          {cycle
-            ? `Runs ${day(cycle.start_date)} to ${day(cycle.end_date)}. The cash floor is the months of fixed costs you never want to drop below.`
-            : "Pick the day the 12 months start. The cash floor is the months of fixed costs you never want to drop below."}
-        </p>
-      </section>
+      {(() => {
+        const next = new Date();
+        const firstOfNext = new Date(Date.UTC(next.getFullYear(), next.getMonth() + 1, 1)).toISOString().slice(0, 10);
+        const floorNow = Number(cycle?.runway_floor_months ?? 3);
+        const form = (
+          <form action={savePlanYear} className="mt-4 space-y-5">
+            <input type="hidden" name="business_id" value={id} />
+            <input type="hidden" name="return_to" value={back} />
+            {cycle && <input type="hidden" name="id" value={cycle.id} />}
+            <div>
+              <label className="label" htmlFor="start_date">When should the 12 months start?</label>
+              <p className="hint mb-2">
+                Most people start on the first of next month, which is filled in for you. If your business already has
+                a financial year, use its first day instead.
+              </p>
+              <input className="input max-w-56" id="start_date" name="start_date" type="date" required defaultValue={cycle?.start_date ?? firstOfNext} />
+            </div>
+            <div>
+              <label className="label" htmlFor="runway_floor_months">How big a safety cushion do you want in the bank?</label>
+              <p className="hint mb-2">
+                If sales stopped tomorrow, how many months could you keep paying the bills you can&apos;t avoid, such as
+                rent, wages and loan payments? The plan will warn you whenever your cash would fall below this. Three
+                months is a common minimum.
+              </p>
+              <select className="input max-w-56" id="runway_floor_months" name="runway_floor_months" defaultValue={String(floorNow)}>
+                {Array.from(new Set([1, 2, 3, 4, 6, 9, 12, floorNow]))
+                  .sort((x, y) => x - y)
+                  .map((n) => (
+                    <option key={n} value={n}>
+                      {n} month{n === 1 ? "" : "s"}
+                    </option>
+                  ))}
+              </select>
+            </div>
+            <button className={cycle ? "btn btn-secondary" : "btn"}>{cycle ? "Save" : "Start the year plan"}</button>
+          </form>
+        );
+        return cycle ? (
+          <details className="card mt-6 p-0">
+            <summary className="flex cursor-pointer flex-wrap items-baseline justify-between gap-2 p-4">
+              <span>
+                <span className="font-semibold">Planning {day(cycle.start_date)} to {day(cycle.end_date)}</span>
+                <span className="hint block">Safety cushion: {floorNow} month{floorNow === 1 ? "" : "s"} of unavoidable bills</span>
+              </span>
+              <span className="text-sm underline underline-offset-4">Change</span>
+            </summary>
+            <div className="border-t border-[var(--line)] p-4 pt-0">{form}</div>
+          </details>
+        ) : (
+          <section className="card mt-6 p-5">
+            <h2 className="display text-xl font-bold">First, which 12 months are you planning?</h2>
+            <p className="mt-1 max-w-2xl text-sm text-[var(--muted)]">
+              A year plan covers the next 12 months. Two quick answers set it up, and you can change them later.
+            </p>
+            {form}
+          </section>
+        );
+      })()}
 
       {!cycle ? (
-        <p className="mt-6 text-[var(--muted)]">Set the plan year to open the rest of this page.</p>
+        <p className="mt-6 text-[var(--muted)]">Once that&apos;s set, the rest of the year plan opens here.</p>
       ) : (
         <>
           {!launch && (
@@ -493,7 +525,7 @@ export default async function YearPage({
                       , leaving <strong>{money(stress.closing)}</strong> in cash at year end
                       {stress.months !== null && (
                         <>
-                          , which covers <strong>{stress.months.toFixed(1)} months</strong> of fixed costs against your floor of {floor}
+                          , which covers <strong>{stress.months.toFixed(1)} months</strong> of fixed costs against the {floor} you wanted as a safety cushion
                         </>
                       )}
                     </>
@@ -501,7 +533,7 @@ export default async function YearPage({
                   .
                 </p>
                 {stress.months !== null && stress.months < floor && (
-                  <p className="mt-2 font-semibold text-[var(--stop)]">That is below your cash floor. Cut fixed costs, raise more money, or lower what you commit to spend until sales are confirmed.</p>
+                  <p className="mt-2 font-semibold text-[var(--stop)]">That is below your safety cushion. Cut fixed costs, raise more money, or lower what you commit to spend until sales are confirmed.</p>
                 )}
                 <p className="hint mt-2">A rough whole-year check. It doesn&apos;t show a mid-year dip, when cash can run short before sales arrive.</p>
               </div>

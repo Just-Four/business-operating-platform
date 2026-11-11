@@ -40,7 +40,7 @@ export default async function BusinessLayout({
       slug: `s/${s.key}`,
       title: sessionTitle(s.key, business.stage),
       state: !s.built ? "off" : r?.completed_at ? "complete" : "empty",
-      note: !s.built ? "Next build" : s.checkpoint ? (r?.approved_at ? "Reviewed" : "Review checkpoint") : undefined,
+      note: !s.built ? "Not available yet" : s.checkpoint ? (r?.approved_at ? "Reviewed" : "Review checkpoint") : undefined,
       highlight: !!s.checkpoint,
     };
   });
@@ -52,7 +52,7 @@ export default async function BusinessLayout({
       slug: p.slug,
       title: p.title,
       state: s === "off" ? "off" : (progress.states[p.slug] ?? "empty"),
-      note: s === "on" ? (p.built ? undefined : "Next build") : STATE_LABELS[s],
+      note: s === "on" ? (p.built ? undefined : "Not available yet") : STATE_LABELS[s],
     };
   });
 

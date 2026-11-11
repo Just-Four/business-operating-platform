@@ -8,7 +8,7 @@ type Row = { key: string; scheduled_on: string | null; completed_at: string | nu
 
 function status(s: { completed_at: string | null; scheduled_on: string | null }, built: boolean, today: string) {
   if (s.completed_at) return { tone: "go", text: "Done" };
-  if (!built) return { tone: "quiet", text: "Next build" };
+  if (!built) return { tone: "quiet", text: "Not available yet" };
   if (!s.scheduled_on) return { tone: "quiet", text: "Not scheduled" };
   if (s.scheduled_on < today) return { tone: "stop", text: "Behind" };
   if (s.scheduled_on === today) return { tone: "wait", text: "Today" };

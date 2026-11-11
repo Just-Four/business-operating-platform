@@ -21,9 +21,9 @@ export const MODELS: Record<string, string> = {
 export const STATE_LABELS: Record<PartState, string> = {
   on: "On",
   yearly: "Check yearly",
-  short: "Short form",
-  until_exit: "Until launch exit",
-  reduced: "Reduced set",
+  short: "Short version",
+  until_exit: "Until first sales",
+  reduced: "Shorter for a new business",
   off: "Off",
 };
 

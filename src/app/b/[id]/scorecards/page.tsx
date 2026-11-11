@@ -31,6 +31,7 @@ function fmt(n: number | null | undefined, unit?: string | null) {
   if (n === null || n === undefined) return "–";
   const v = Number(n).toLocaleString("en-GB", { maximumFractionDigits: 2 });
   if (!unit) return v;
+  if (unit === "%") return `${v}%`;
   return unit.length <= 1 ? `${unit}${v}` : `${v} ${unit}`;
 }
 
@@ -96,7 +97,13 @@ export default async function ScorecardsPage({
           <div className="card p-4" style={{ borderLeft: "6px solid var(--line)" }}>
             <p className="display text-3xl font-bold">{missing.length}</p>
             <p className="font-semibold">Not entered this week</p>
-            <p className="hint">{missing.map((s) => `${s.m.name} (${roleName(s.m.role_id)})`).join(", ") || "All in"}</p>
+            <p className="hint">
+              {missing.length === 0
+                ? "All in"
+                : missing.length === ms.length
+                  ? "Nothing entered yet. Type this week's numbers in the boxes below and save."
+                  : `${missing.slice(0, 3).map((s) => `${s.m.name} (${roleName(s.m.role_id)})`).join(", ")}${missing.length > 3 ? `, and ${missing.length - 3} more` : ""}`}
+            </p>
           </div>
         </div>
       )}

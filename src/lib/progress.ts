@@ -20,6 +20,12 @@ export async function getProgress(supabase: SupabaseClient, id: string): Promise
   const { data: qr } = await supabase.from("key_results").select("priority_id").eq("business_id", id);
   const nPriorities = (qp ?? []).length;
   const withNumber = (qp ?? []).filter((p) => (qr ?? []).some((r) => r.priority_id === p.id)).length;
+  const { data: rl } = await supabase.from("roles").select("id, filled_by").eq("business_id", id).eq("active", true);
+  const { data: me } = await supabase.from("measures").select("role_id").eq("business_id", id).eq("active", true);
+  const nRoles = (rl ?? []).length;
+  const nVacant = (rl ?? []).filter((r) => !r.filled_by).length;
+  const nMeasures = (me ?? []).length;
+  const rolesWithout = (rl ?? []).filter((r) => r.filled_by && !(me ?? []).some((m) => m.role_id === r.id)).length;
   const { data: rh } = await supabase.from("rhythm_items").select("id").eq("business_id", id);
   const { data: rv } = await supabase.from("reviews").select("status").eq("business_id", id).eq("kind", "monthly");
   const nRhythm = (rh ?? []).length;
@@ -64,6 +70,8 @@ export async function getProgress(supabase: SupabaseClient, id: string): Promise
     direction: r?.purpose && r?.mid_term_year ? "complete" : r?.purpose || r?.long_term_target ? "partial" : "empty",
     launch: a.length >= 3 && m.length > 0 ? "complete" : a.length || m.length ? "partial" : "empty",
     year: nBattles > 0 && hasNumbers ? "complete" : cyc ? "partial" : "empty",
+    team: nRoles ? "complete" : "empty",
+    scorecards: nMeasures ? "complete" : "empty",
     rhythm: nRhythm >= 2 ? "complete" : nRhythm ? "partial" : "empty",
     reviews: nHeld ? "complete" : (rv ?? []).length ? "partial" : "empty",
     quarter: nPriorities >= 3 && withNumber === nPriorities ? "complete" : nPriorities ? "partial" : "empty",
@@ -79,6 +87,8 @@ export async function getProgress(supabase: SupabaseClient, id: string): Promise
       a.length || m.length
         ? `${provenAssumptions} of ${a.length} assumptions proven, ${met} of ${m.length} milestones met`
         : "Not started",
+    team: nRoles ? `${nRoles} role${nRoles === 1 ? "" : "s"}, ${nVacant} vacant` : "Not started",
+    scorecards: nMeasures ? `${nMeasures} measure${nMeasures === 1 ? "" : "s"}${rolesWithout ? `, ${rolesWithout} filled role${rolesWithout === 1 ? "" : "s"} with none` : ""}` : "Not started",
     rhythm: nRhythm ? `${nRhythm} standing meeting${nRhythm === 1 ? "" : "s"}` : "Not started",
     reviews: nHeld ? `${nHeld} review${nHeld === 1 ? "" : "s"} held` : "None held yet",
     quarter: nPriorities ? `${nPriorities} priorit${nPriorities === 1 ? "y" : "ies"}, ${withNumber} with a number` : "Not started",

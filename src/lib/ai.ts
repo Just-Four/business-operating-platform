@@ -187,6 +187,32 @@ export async function loadPlan(supabase: SupabaseClient, businessId: string) {
     for (const it of (lookback.items ?? []) as Record<string, unknown>[]) lines.push(`- ${JSON.stringify(it)}`);
     for (const k of ["furthest_wrong", "lost_why", "least_profitable", "no_payback", "biggest_lesson"]) if (lookback[k]) lines.push(`${k.replace(/_/g, " ")}: ${lookback[k]}`);
   }
+  const { data: cyc } = await supabase.from("plan_cycles").select("id, start_date, end_date, runway_floor_months").eq("business_id", businessId).order("start_date", { ascending: false }).limit(1).maybeSingle();
+  if (cyc) {
+    const [{ data: bt }, { data: dm }, { data: fl }, { data: rk }, { data: qp }] = await Promise.all([
+      supabase.from("must_win_battles").select("number, title, winning_looks_like, kpi, target, deadline, answers_diagnosis, owner_role_id").eq("plan_cycle_id", cyc.id).order("number"),
+      supabase.from("demand_sources").select("source, starts_paying, ends_or_renews, monthly_value, confidence, evidence").eq("plan_cycle_id", cyc.id),
+      supabase.from("financial_lines").select("scenario, measure, value").eq("plan_cycle_id", cyc.id).eq("forecast_version", 0),
+      supabase.from("risks").select("risk, early_warning, response, likelihood, impact, status").eq("business_id", businessId),
+      supabase.from("quarterly_priorities").select("quarter_start, number, objective, due_date, owner_role_id").eq("business_id", businessId).order("quarter_start").order("number"),
+    ]);
+    lines.push(`\nYEAR PLAN (${cyc.start_date} to ${cyc.end_date}; safety cushion ${cyc.runway_floor_months} months of fixed costs)`);
+    lines.push("Must-Win Battles:");
+    for (const x of bt ?? []) lines.push(`- ${x.number}. ${x.title}. Winning: ${x.winning_looks_like ?? "(empty)"} Measure: ${x.kpi ?? "(none)"}, target ${x.target ?? "(none)"}, by ${x.deadline ?? "(no date)"}. Owner: ${x.owner_role_id ? "set" : "none"}. Tackles the obstacle by: ${x.answers_diagnosis ?? "(empty)"}`);
+    if (!(bt ?? []).length) lines.push("(none)");
+    lines.push("Sources of sales (confirmed = signed or paid, likely = written commitment, speculative = hoped for):");
+    for (const x of dm ?? []) lines.push(`- ${x.source}: ${x.monthly_value ?? "?"} ${cur} a month from ${x.starts_paying ?? "?"} to ${x.ends_or_renews ?? "open"} [${x.confidence}]. ${x.evidence ?? ""}`);
+    if (!(dm ?? []).length) lines.push("(none)");
+    lines.push("Numbers for the year (budget = likely, commit = promise, stretch = possible):");
+    for (const x of fl ?? []) lines.push(`- ${x.scenario} ${x.measure}: ${x.value} ${cur}`);
+    if (!(fl ?? []).length) lines.push("(none)");
+    lines.push("Risks:");
+    for (const x of rk ?? []) lines.push(`- ${x.risk} [chance ${x.likelihood}, damage ${x.impact}, ${x.status}]. Early sign: ${x.early_warning ?? "(none)"}. Response: ${x.response ?? "(none)"}`);
+    if (!(rk ?? []).length) lines.push("(none)");
+    lines.push("Quarterly priorities:");
+    for (const x of qp ?? []) lines.push(`- Quarter from ${x.quarter_start}, ${x.number}. ${x.objective}${x.due_date ? `, due ${x.due_date}` : ""}. Owner: ${x.owner_role_id ? "set" : "none"}`);
+    if (!(qp ?? []).length) lines.push("(none)");
+  }
   return { text: lines.join("\n"), grades };
 }
 

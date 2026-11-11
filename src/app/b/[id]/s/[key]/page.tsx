@@ -48,8 +48,9 @@ export default async function SessionPage({
     data: { user },
   } = await supabase.auth.getUser();
 
-  const { data: aiReview } = key === "checkpoint_1"
-    ? await supabase.from("ai_reviews").select("id, content, created_at, responses").eq("business_id", id).eq("kind", "checkpoint").order("created_at", { ascending: false }).limit(1).maybeSingle()
+  const isCheckpoint = key === "checkpoint_1" || key === "sign_off";
+  const { data: aiReview } = isCheckpoint
+    ? await supabase.from("ai_reviews").select("id, content, created_at, responses").eq("business_id", id).eq("kind", "checkpoint").eq("session_key", key).order("created_at", { ascending: false }).limit(1).maybeSingle()
     : { data: null };
   const [{ data: biz }, { data: row }, { data: me }, { data: canvas }, { data: evidence }, { data: diag }] = await Promise.all([
     supabase.from("businesses").select("name, model, stage, currency").eq("id", id).single(),
@@ -230,11 +231,26 @@ export default async function SessionPage({
           </form>
         )}
 
-        {key === "checkpoint_1" && (
+        {isCheckpoint && (
           <div className="space-y-6">
+            {key === "sign_off" && (
+              <div className="card p-5">
+                <h2 className="text-xl font-bold">The whole plan, one last time</h2>
+                <p className="mt-2 text-sm">
+                  This review covers everything: the business model, diagnosis, direction, the year&apos;s battles and
+                  numbers, and this quarter&apos;s priorities. Read these through before you ask for the challenge.
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Link className="btn btn-secondary" href={`/b/${id}/year`}>Open the year plan</Link>
+                  <Link className="btn btn-secondary" href={`/b/${id}/quarter`}>Open this quarter</Link>
+                </div>
+              </div>
+            )}
             <div className="card p-5">
               <h2 className="text-xl font-bold">The questions to be challenged on</h2>
               <ul className="mt-2 list-disc space-y-1 pl-5">
+                {key === "sign_off" && <li>Do the battles answer the obstacle, and does each have an owner and a number?</li>}
+                {key === "sign_off" && <li>Could you still pay the bills if sales only reached the promise?</li>}
                 <li>Is it clear exactly who pays, and could you find them?</li>
                 <li>Would they really choose this over what they do today?</li>
                 <li>Does the money add up at a realistic volume?</li>
@@ -470,7 +486,7 @@ export default async function SessionPage({
               finish the session.
             </p>
             <div className="mt-4 flex flex-wrap gap-2">
-              <Link href={`/b/${id}/${session.part}?session=${key}${key === "numbers" ? "#numbers" : key === "battles" ? "#battles" : ""}`} className="btn btn-secondary">
+              <Link href={`/b/${id}/${session.part}?session=${key}${key === "numbers" ? "#numbers" : key === "battles" ? "#battles" : key === "lock" ? "#lock" : ""}`} className="btn btn-secondary">
                 Open the {PART_LABEL[session.part] ?? session.part} screen
               </Link>
               <FinishForm id={id} sessionKey={key} />

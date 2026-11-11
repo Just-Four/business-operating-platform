@@ -794,6 +794,8 @@ export async function saveNumbers(formData: FormData) {
   const cycle = String(formData.get("plan_cycle_id"));
   const month = String(formData.get("month"));
   const supabase = await createClient();
+  const { data: cyc } = await supabase.from("plan_cycles").select("status").eq("id", cycle).single();
+  if (cyc?.status === "approved") return done(formData, supabase, businessId, "year", "The plan is locked, so the numbers can't change. Unlock it at the bottom of this page first.");
   const rows: { business_id: string; plan_cycle_id: string; scenario: string; month: string; measure: string; value: number; forecast_version: number }[] = [];
   for (const [k, v] of formData.entries()) {
     const m = k.match(/^n_(budget|commit|stretch)_([a-z_]+)$/);
@@ -986,4 +988,116 @@ export async function pastePriorities(formData: FormData) {
     }
   }
   await done(formData, supabase, businessId, "quarter", error);
+}
+
+// ---------- Part 9: operating rhythm ----------
+
+const STANDARD_RHYTHM = [
+  { name: "Weekly check-in", cadence: "weekly", when_text: "Monday morning", minutes: 30, attendees: "Everyone who owns a number", agenda: "Scorecards: what's off target and why\nTasks that are blocked or waiting for approval\nThe one thing each person will finish this week" },
+  { name: "Monthly review", cadence: "monthly", when_text: "First week of the month", minutes: 90, attendees: "The owners, and whoever challenges the plan", agenda: "The month against the plan\nMust-Win Battles: on track or not\nRisks: any early signs showing\nDecisions needed\nActions, each with an owner and a date" },
+  { name: "Quarterly reset", cadence: "quarterly", when_text: "Last week of the quarter", minutes: 180, attendees: "The owners", agenda: "Score last quarter's priorities honestly\nWhat we learned\nSet next quarter's three to five priorities\nCheck roles and capacity" },
+  { name: "Yearly plan", cadence: "yearly", when_text: "Six weeks before the plan year ends", minutes: 360, attendees: "The owners, and whoever challenges the plan", agenda: "What last year taught us\nRefresh the diagnosis and direction\nNext year's battles and numbers\nGet it challenged before it's locked" },
+];
+
+export async function loadStandardRhythm(formData: FormData) {
+  const businessId = String(formData.get("business_id"));
+  const supabase = await createClient();
+  const { data: existing } = await supabase.from("rhythm_items").select("cadence").eq("business_id", businessId);
+  const rows = STANDARD_RHYTHM.filter((r) => !(existing ?? []).some((e) => e.cadence === r.cadence)).map((r, i) => ({ ...r, business_id: businessId, sort: i }));
+  const { error } = rows.length ? await supabase.from("rhythm_items").insert(rows) : { error: null };
+  await done(formData, supabase, businessId, "rhythm", error?.message);
+}
+
+export async function saveRhythm(formData: FormData) {
+  const businessId = String(formData.get("business_id"));
+  const id = str(formData, "id");
+  const supabase = await createClient();
+  if (id && formData.get("remove") === "1") {
+    const { error } = await supabase.from("rhythm_items").delete().eq("id", id).eq("business_id", businessId);
+    return done(formData, supabase, businessId, "rhythm", error?.message);
+  }
+  const row = {
+    business_id: businessId,
+    name: str(formData, "name") ?? "Meeting",
+    cadence: str(formData, "cadence") ?? "weekly",
+    when_text: str(formData, "when_text"),
+    minutes: num(formData, "minutes"),
+    attendees: str(formData, "attendees"),
+    agenda: str(formData, "agenda"),
+    updated_at: new Date().toISOString(),
+  };
+  const { error } = id ? await supabase.from("rhythm_items").update(row).eq("id", id) : await supabase.from("rhythm_items").insert(row);
+  await done(formData, supabase, businessId, "rhythm", error?.message);
+}
+
+// ---------- Part 10: monthly review ----------
+
+export async function saveReview(formData: FormData) {
+  const businessId = String(formData.get("business_id"));
+  const period = String(formData.get("period_start"));
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const held = formData.get("held") === "1";
+  const content = JSON.stringify({
+    went_well: str(formData, "went_well"),
+    went_badly: str(formData, "went_badly"),
+    lesson: str(formData, "lesson"),
+    change: str(formData, "change"),
+  });
+  const row: Record<string, unknown> = { business_id: businessId, kind: "monthly", period_start: period, content, prepared_by: user?.email ?? null, updated_at: new Date().toISOString() };
+  if (held) {
+    row.status = "held";
+    row.held_on = new Date().toISOString().slice(0, 10);
+  }
+  const { error } = await supabase.from("reviews").upsert(row, { onConflict: "business_id,kind,period_start" });
+  await done(formData, supabase, businessId, "reviews", error?.message);
+}
+
+export async function addDecision(formData: FormData) {
+  const businessId = String(formData.get("business_id"));
+  const period = String(formData.get("period_start"));
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  let { data: review } = await supabase.from("reviews").select("id").eq("business_id", businessId).eq("kind", "monthly").eq("period_start", period).maybeSingle();
+  if (!review) {
+    const r = await supabase.from("reviews").insert({ business_id: businessId, kind: "monthly", period_start: period, content: "{}" }).select("id").single();
+    review = r.data;
+  }
+  const { error } = await supabase.from("decisions").insert({
+    business_id: businessId,
+    review_id: review?.id ?? null,
+    question: str(formData, "question") ?? "",
+    decision: str(formData, "decision"),
+    status: str(formData, "decision") ? "decided" : "open",
+    decided_by: user?.id ?? null,
+    decided_on: str(formData, "decision") ? new Date().toISOString().slice(0, 10) : null,
+  });
+  await done(formData, supabase, businessId, "reviews", error?.message);
+}
+
+// ---------- Locking the plan ----------
+
+export async function lockPlan(formData: FormData) {
+  const businessId = String(formData.get("business_id"));
+  const cycle = String(formData.get("plan_cycle_id"));
+  const supabase = await createClient();
+  const unlock = formData.get("unlock") === "1";
+  if (!unlock) {
+    const [{ data: approved }, { data: ai }] = await Promise.all([
+      supabase.from("programme_sessions").select("key").eq("business_id", businessId).not("approved_at", "is", null).limit(1),
+      supabase.from("ai_reviews").select("id").eq("business_id", businessId).limit(1),
+    ]);
+    if (!(approved ?? []).length && !(ai ?? []).length) {
+      return done(formData, supabase, businessId, "year", "Get the plan challenged before you lock it: run the AI review or record a review by someone else.");
+    }
+  }
+  const { error } = await supabase
+    .from("plan_cycles")
+    .update(unlock ? { status: "draft", approved_on: null } : { status: "approved", approved_on: new Date().toISOString().slice(0, 10) })
+    .eq("id", cycle);
+  await done(formData, supabase, businessId, "year", error?.message);
 }

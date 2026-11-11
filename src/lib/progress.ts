@@ -20,6 +20,10 @@ export async function getProgress(supabase: SupabaseClient, id: string): Promise
   const { data: qr } = await supabase.from("key_results").select("priority_id").eq("business_id", id);
   const nPriorities = (qp ?? []).length;
   const withNumber = (qp ?? []).filter((p) => (qr ?? []).some((r) => r.priority_id === p.id)).length;
+  const { data: rh } = await supabase.from("rhythm_items").select("id").eq("business_id", id);
+  const { data: rv } = await supabase.from("reviews").select("status").eq("business_id", id).eq("kind", "monthly");
+  const nRhythm = (rh ?? []).length;
+  const nHeld = (rv ?? []).filter((r) => r.status === "held").length;
   const nBattles = (yb.data ?? []).length;
   const hasNumbers = (yn.data ?? []).length > 0;
   const [canvas, diag, dir, assumptions, milestones, ev] = await Promise.all([
@@ -60,6 +64,8 @@ export async function getProgress(supabase: SupabaseClient, id: string): Promise
     direction: r?.purpose && r?.mid_term_year ? "complete" : r?.purpose || r?.long_term_target ? "partial" : "empty",
     launch: a.length >= 3 && m.length > 0 ? "complete" : a.length || m.length ? "partial" : "empty",
     year: nBattles > 0 && hasNumbers ? "complete" : cyc ? "partial" : "empty",
+    rhythm: nRhythm >= 2 ? "complete" : nRhythm ? "partial" : "empty",
+    reviews: nHeld ? "complete" : (rv ?? []).length ? "partial" : "empty",
     quarter: nPriorities >= 3 && withNumber === nPriorities ? "complete" : nPriorities ? "partial" : "empty",
   };
 
@@ -73,6 +79,8 @@ export async function getProgress(supabase: SupabaseClient, id: string): Promise
       a.length || m.length
         ? `${provenAssumptions} of ${a.length} assumptions proven, ${met} of ${m.length} milestones met`
         : "Not started",
+    rhythm: nRhythm ? `${nRhythm} standing meeting${nRhythm === 1 ? "" : "s"}` : "Not started",
+    reviews: nHeld ? `${nHeld} review${nHeld === 1 ? "" : "s"} held` : "None held yet",
     quarter: nPriorities ? `${nPriorities} priorit${nPriorities === 1 ? "y" : "ies"}, ${withNumber} with a number` : "Not started",
     year: cyc ? `${nBattles} Must-Win Battle${nBattles === 1 ? "" : "s"}, numbers ${hasNumbers ? "entered" : "not entered"}` : "Not started",
   };

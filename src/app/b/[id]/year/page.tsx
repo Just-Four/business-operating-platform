@@ -11,6 +11,7 @@ import {
   removeYearRow,
   saveNumbers,
   pasteYearRows,
+  lockPlan,
 } from "../actions";
 
 type Battle = {
@@ -649,6 +650,36 @@ export default async function YearPage({
                 <PasteBox id={id} cycle={cycle.id} kind="risks" back={back} columns="risk, early sign, what you'll do, how likely (high, medium or low), how much damage (high, medium or low)" />
               </div>
             </details>
+          </section>
+
+          {/* Lock */}
+          <section id="lock" className="mt-12">
+            <h2 className="display text-2xl font-bold">Lock the plan</h2>
+            <p className="hint max-w-2xl">
+              Locking freezes the three cases, so the rest of the year is measured against what you planned and not
+              against numbers that moved. Battles, sales sources and risks stay open.
+            </p>
+            <form action={lockPlan} className="card mt-3 flex flex-wrap items-center justify-between gap-3 p-4">
+              <input type="hidden" name="business_id" value={id} />
+              <input type="hidden" name="plan_cycle_id" value={cycle.id} />
+              <input type="hidden" name="return_to" value={back} />
+              {cycle.status === "approved" ? (
+                <>
+                  <p className="text-sm">
+                    <span className="tag mr-2" data-tone="go">Locked</span>
+                    on {day(cycle.approved_on)}. The numbers can&apos;t be changed while it&apos;s locked.
+                  </p>
+                  <button name="unlock" value="1" className="btn btn-secondary">Unlock to make changes</button>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm">
+                    {bs.length} of 3 battles set, numbers {b ? "entered" : "not entered"}. The plan must have been challenged first, by the AI review or by someone else.
+                  </p>
+                  <button className="btn" disabled={!b || bs.length === 0}>Lock the plan</button>
+                </>
+              )}
+            </form>
           </section>
         </>
       )}

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import NextPart from "@/components/NextPart";
 import { createClient } from "@/lib/supabase/server";
 import { addMeasure, saveReadings } from "../actions";
 import Notice from "@/components/Notice";
@@ -40,10 +41,10 @@ export default async function ScorecardsPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ error?: string; saved?: string; week?: string }>;
+  searchParams: Promise<{ error?: string; saved?: string; week?: string; session?: string }>;
 }) {
   const { id } = await params;
-  const { error, saved, week: weekParam } = await searchParams;
+  const { error, saved, week: weekParam, session } = await searchParams;
   const week = weekParam && /^\d{4}-\d{2}-\d{2}$/.test(weekParam) ? weekStart(new Date(`${weekParam}T12:00:00Z`)) : weekStart();
   const weeks = [shift(week, -21), shift(week, -14), shift(week, -7), week];
   const supabase = await createClient();
@@ -86,6 +87,12 @@ export default async function ScorecardsPage({
   return (
     <div className="max-w-6xl">
       <Notice error={error} saved={saved} />
+      {session && (
+        <p className="mb-4 rounded border border-[var(--line)] bg-white p-3 text-sm">
+          You&apos;re in a planning session.{" "}
+          <Link href={`/b/${id}/s/${session}`} className="font-semibold underline underline-offset-4">Back to the session</Link>
+        </p>
+      )}
       <p className="hint">Part 7</p>
       <h1 className="text-4xl font-bold leading-none sm:text-5xl">Scorecards</h1>
       <p className="mt-3 max-w-2xl text-[var(--muted)]">
@@ -137,7 +144,7 @@ export default async function ScorecardsPage({
         <form action={saveReadings} className="mt-6 space-y-6">
           <input type="hidden" name="business_id" value={id} />
           <input type="hidden" name="period_start" value={week} />
-          <input type="hidden" name="return_to" value={`/b/${id}/scorecards?week=${week}`} />
+          <input type="hidden" name="return_to" value={`/b/${id}/scorecards?week=${week}${session ? `&session=${session}` : ""}`} />
           {groups.map((g) => (
             <section key={g.key} className="card overflow-x-auto p-0">
               <div className="flex items-baseline justify-between gap-3 border-b border-[var(--line)] p-4">
@@ -326,6 +333,7 @@ export default async function ScorecardsPage({
           <button className="btn">Add measure</button>
         </form>
       </details>
+      <NextPart businessId={id} slug="scorecards" />
     </div>
   );
 }

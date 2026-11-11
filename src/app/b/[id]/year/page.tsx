@@ -1,4 +1,5 @@
 import Link from "next/link";
+import NextPart from "@/components/NextPart";
 import { createClient } from "@/lib/supabase/server";
 import Notice from "@/components/Notice";
 import {
@@ -161,6 +162,7 @@ export default async function YearPage({
         })()
       : null;
   const floor = Number(cycle?.runway_floor_months ?? 3);
+  const locked = cycle?.status === "approved";
   const budgetRev = val("budget", "revenue");
 
   const pct = (n: number | null | undefined) => (n === null || n === undefined ? "–" : `${n.toFixed(0)}%`);
@@ -476,7 +478,7 @@ export default async function YearPage({
                       </td>
                       {CASES.map((k) => (
                         <td key={k.key} className="px-2 py-3">
-                          <input className="input" name={`n_${k.key}_${l.key}`} inputMode="decimal" aria-label={`${l.label}, ${k.label}`} defaultValue={val(k.key, l.key) ?? ""} />
+                          <input className="input" name={`n_${k.key}_${l.key}`} inputMode="decimal" disabled={locked} aria-label={`${l.label}, ${k.label}`} defaultValue={val(k.key, l.key) ?? ""} />
                         </td>
                       ))}
                     </tr>
@@ -503,16 +505,23 @@ export default async function YearPage({
               <div className="grid gap-4 border-t border-[var(--line)] p-4 sm:grid-cols-[14rem_14rem_1fr] sm:items-end">
                 <div>
                   <label className="label" htmlFor="opening_cash">Cash at the start ({cur})</label>
-                  <input className="input" id="opening_cash" name="n_budget_opening_cash" inputMode="decimal" defaultValue={opening ?? ""} />
+                  <input className="input" id="opening_cash" name="n_budget_opening_cash" inputMode="decimal" disabled={locked} defaultValue={opening ?? ""} />
                 </div>
                 <div>
                   <label className="label" htmlFor="funding_in">New money coming in ({cur})</label>
-                  <input className="input" id="funding_in" name="n_budget_funding_in" inputMode="decimal" defaultValue={val("budget", "funding_in") ?? ""} />
+                  <input className="input" id="funding_in" name="n_budget_funding_in" inputMode="decimal" disabled={locked} defaultValue={val("budget", "funding_in") ?? ""} />
                 </div>
                 <p className="hint">Loans, investment or your own money put in during the year. Leave blank if none.</p>
               </div>
               <div className="border-t border-[var(--line)] p-4">
-                <button className="btn">Save the numbers</button>
+                {locked ? (
+                  <p className="text-sm">
+                    <span className="tag mr-2" data-tone="go">Locked</span>
+                    The numbers are frozen. <a className="underline underline-offset-4" href="#lock">Unlock the plan</a> to change them.
+                  </p>
+                ) : (
+                  <button className="btn">Save the numbers</button>
+                )}
               </div>
             </form>
 
@@ -683,6 +692,7 @@ export default async function YearPage({
           </section>
         </>
       )}
+      <NextPart businessId={id} slug="year" />
     </div>
   );
 }

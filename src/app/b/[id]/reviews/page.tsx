@@ -1,4 +1,5 @@
 import Link from "next/link";
+import NextPart from "@/components/NextPart";
 import { createClient } from "@/lib/supabase/server";
 import Notice from "@/components/Notice";
 import { saveReview, addDecision, addTask } from "../actions";
@@ -322,6 +323,7 @@ export default async function ReviewsPage({
           </div>
         </section>
       )}
+      <NextPart businessId={id} slug="reviews" />
     </div>
   );
 }

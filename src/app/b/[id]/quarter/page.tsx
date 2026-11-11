@@ -1,4 +1,5 @@
 import Link from "next/link";
+import NextPart from "@/components/NextPart";
 import { createClient } from "@/lib/supabase/server";
 import Notice from "@/components/Notice";
 import { savePriority, removePriority, addKeyResult, updateKeyResult, pastePriorities, addTask } from "../actions";
@@ -288,6 +289,7 @@ export default async function QuarterPage({
       ) : (
         <p className="hint mt-4">Five is the limit for one quarter. More than that and nothing is a priority.</p>
       )}
+      <NextPart businessId={id} slug="quarter" />
     </div>
   );
 }

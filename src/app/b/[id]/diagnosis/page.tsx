@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import NextPart from "@/components/NextPart";
 import { saveDiagnosis } from "../actions";
 import Notice from "@/components/Notice";
 import { guidanceFor } from "@/lib/guidance";
@@ -65,11 +66,12 @@ export default async function DiagnosisPage({
           <ul className="hint mt-2 list-disc space-y-1 pl-5">
             <li>Could a competitor read the diagnosis and know exactly what we&apos;re up against?</li>
             <li>Does the guiding policy say what we will not do?</li>
-            <li>Every Must-Win Battle in Part 5 must answer this diagnosis directly.</li>
+            <li>Every Must-Win Battle in the year plan must answer this diagnosis directly.</li>
           </ul>
         </div>
         <button className="btn">Save diagnosis</button>
       </form>
+      <NextPart businessId={id} slug="diagnosis" />
     </div>
   );
 }

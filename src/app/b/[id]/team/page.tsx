@@ -1,4 +1,5 @@
 import Link from "next/link";
+import NextPart from "@/components/NextPart";
 import { createClient } from "@/lib/supabase/server";
 import { saveRole } from "../actions";
 import Notice from "@/components/Notice";
@@ -30,11 +31,12 @@ function RouteSelect({ name, value, allowNone }: { name: string; value?: string 
   );
 }
 
-function RoleForm({ businessId, role }: { businessId: string; role?: Role }) {
+function RoleForm({ businessId, role, back }: { businessId: string; role?: Role; back?: string }) {
   const p = role?.id ?? "new";
   return (
     <form action={saveRole} className="space-y-4">
       <input type="hidden" name="business_id" value={businessId} />
+      {back && <input type="hidden" name="return_to" value={back} />}
       {role && <input type="hidden" name="id" value={role.id} />}
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
@@ -91,10 +93,11 @@ export default async function TeamPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ error?: string; saved?: string }>;
+  searchParams: Promise<{ error?: string; saved?: string; session?: string }>;
 }) {
   const { id } = await params;
-  const { error, saved } = await searchParams;
+  const { error, saved, session } = await searchParams;
+  const back = session ? `/b/${id}/team?session=${session}` : undefined;
   const supabase = await createClient();
   const [{ data: roles }, { data: measures }, { data: tasks }] = await Promise.all([
     supabase.from("roles").select("*").eq("business_id", id).eq("active", true).order("created_at"),
@@ -106,6 +109,12 @@ export default async function TeamPage({
   return (
     <div className="max-w-4xl">
       <Notice error={error} saved={saved} />
+      {session && (
+        <p className="mb-4 rounded border border-[var(--line)] bg-white p-3 text-sm">
+          You&apos;re in a planning session.{" "}
+          <Link href={`/b/${id}/s/${session}`} className="font-semibold underline underline-offset-4">Back to the session</Link>
+        </p>
+      )}
       <p className="hint">Part 8</p>
       <h1 className="text-4xl font-bold leading-none sm:text-5xl">Roles and team</h1>
       <p className="mt-3 max-w-2xl text-[var(--muted)]">
@@ -140,7 +149,7 @@ export default async function TeamPage({
                 {t > 0 && <span className="tag" data-tone="quiet">{t} open task{t > 1 ? "s" : ""}</span>}
               </summary>
               <div className="border-t border-[var(--line)] p-4">
-                <RoleForm businessId={id} role={r} />
+                <RoleForm businessId={id} role={r} back={back} />
                 <p className="mt-4 flex gap-5 text-sm">
                   <Link className="underline underline-offset-4" href={`/b/${id}/scorecards`}>Scorecard</Link>
                   <Link className="underline underline-offset-4" href={`/b/${id}/tasks?role=${r.id}`}>Tasks</Link>
@@ -154,9 +163,10 @@ export default async function TeamPage({
       <details className="card mt-6 p-0" open={list.length === 0}>
         <summary className="cursor-pointer p-4 font-semibold">Add a role</summary>
         <div className="border-t border-[var(--line)] p-4">
-          <RoleForm businessId={id} />
+          <RoleForm businessId={id} back={back} />
         </div>
       </details>
+      <NextPart businessId={id} slug="team" />
     </div>
   );
 }

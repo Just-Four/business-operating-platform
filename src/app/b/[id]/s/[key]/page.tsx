@@ -125,7 +125,7 @@ export default async function SessionPage({
       <div className="mt-8">
         {!session.built && (
           <div className="card p-6">
-            <p className="font-semibold">This session is in the next build.</p>
+            <p className="font-semibold">This session isn&apos;t available yet.</p>
             <p className="hint mt-1">Everything up to here is ready to work through now.</p>
           </div>
         )}
@@ -502,6 +502,11 @@ export default async function SessionPage({
               <Link href={`/b/${id}/${session.part}?session=${key}${key === "numbers" ? "#numbers" : key === "battles" ? "#battles" : key === "lock" ? "#lock" : ""}`} className="btn btn-secondary">
                 Open the {PART_LABEL[session.part] ?? session.part} screen
               </Link>
+              {key === "quarter" && (
+                <Link href={`/b/${id}/scorecards?session=${key}`} className="btn btn-secondary">
+                  Open scorecards
+                </Link>
+              )}
               <FinishForm id={id} sessionKey={key} />
             </div>
           </div>

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import NextPart from "@/components/NextPart";
 import { createClient } from "@/lib/supabase/server";
 import { saveDirection } from "../actions";
 import Notice from "@/components/Notice";
@@ -71,7 +72,7 @@ export default async function DirectionPage({
               <input className="input" id="mid_term_revenue" name="mid_term_revenue" inputMode="numeric" defaultValue={data?.mid_term_revenue ?? ""} />
             </div>
             <div>
-              <label className="label" htmlFor="mid_term_profit_pct">EBITDA (%)</label>
+              <label className="label" htmlFor="mid_term_profit_pct">Profit margin (%)</label>
               <input className="input" id="mid_term_profit_pct" name="mid_term_profit_pct" inputMode="decimal" defaultValue={data?.mid_term_profit_pct ?? ""} />
             </div>
             <div>
@@ -96,9 +97,10 @@ export default async function DirectionPage({
           </div>
         </div>
 
-        <p className="hint">The Must-Win Battles in Part 5 must move the business measurably towards these targets.</p>
+        <p className="hint">Profit margin here means profit before tax and interest, as a share of sales, the same as in the year plan. The Must-Win Battles in the year plan must move the business measurably towards these targets.</p>
         <button className="btn">Save direction</button>
       </form>
+      <NextPart businessId={id} slug="direction" />
     </div>
   );
 }

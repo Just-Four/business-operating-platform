@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import NextPart from "@/components/NextPart";
 import { addEvidence, deleteEvidence, saveCanvas } from "../actions";
 import Notice from "@/components/Notice";
 import CanvasBoard from "@/components/CanvasBoard";
@@ -50,6 +51,7 @@ export default async function CanvasPage({
           deleteEvidence={deleteEvidence}
         />
       </div>
+      <NextPart businessId={id} slug="canvas" />
     </div>
   );
 }

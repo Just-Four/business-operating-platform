@@ -192,7 +192,7 @@ export const LOOKBACK_MEASURES = [
   "Revenue",
   "Gross margin (%)",
   "Overheads",
-  "EBITDA or net profit",
+  "Profit before tax and interest",
   "Closing cash",
   "Customers or units at year end",
   "New customers or sales won",

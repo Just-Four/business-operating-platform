@@ -1,4 +1,5 @@
 import Link from "next/link";
+import NextPart from "@/components/NextPart";
 import { createClient } from "@/lib/supabase/server";
 import { ASSUMPTION_STATUSES, MILESTONE_STATUSES, label } from "@/lib/framework";
 import {
@@ -51,7 +52,7 @@ export default async function LaunchPage({
       <h1 className="text-4xl font-bold leading-none sm:text-5xl">Launch plan</h1>
       <p className="mt-3 text-[var(--muted)] max-w-3xl">
         A new business plans against assumptions, not history. Test the riskiest first, and release more money only
-        when a milestone is met. When milestone 6 is met, switch the stage to Early revenue.
+        when a milestone is met. When the last milestone is met, switch the stage to Early revenue on the business overview.
       </p>
 
       <section className="mt-8">
@@ -181,6 +182,7 @@ export default async function LaunchPage({
           </div>
         </form>
       </section>
+      <NextPart businessId={id} slug="launch" />
     </div>
   );
 }

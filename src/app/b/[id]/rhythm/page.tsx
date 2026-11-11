@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import NextPart from "@/components/NextPart";
 import Notice from "@/components/Notice";
 import { loadStandardRhythm, saveRhythm } from "../actions";
 
@@ -125,6 +126,7 @@ export default async function RhythmPage({
           <ItemForm businessId={id} />
         </div>
       </details>
+      <NextPart businessId={id} slug="rhythm" />
     </div>
   );
 }

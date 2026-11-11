@@ -105,8 +105,8 @@ export const SESSIONS: Session[] = [
   },
   { key: "battles", seq: 9, title: "The three battles that decide the year", minutes: 45, why: "Focus wins. Three priorities that answer your diagnosis beat ten that don't.", skipCost: "", output: "Up to three Must-Win Battles.", built: true, part: "year" },
   { key: "numbers", seq: 10, title: "The numbers", minutes: 60, why: "Turn the battles into money: what's likely, what you'll promise, and what's possible.", skipCost: "", output: "The numbers in three cases, with a stress test.", built: true, part: "year" },
-  { key: "quarter", seq: 11, title: "This quarter, and how you'll know", minutes: 45, why: "A year is too long to steer by. Quarters and weekly numbers tell you early when you're drifting.", skipCost: "", output: "Quarterly priorities and scorecards.", built: false },
-  { key: "roles", seq: 12, title: "Who does what", minutes: 45, why: "Every target needs one owner, whether that's a person, an automation or an AI.", skipCost: "", output: "Role cards.", built: false },
+  { key: "quarter", seq: 11, title: "This quarter, and how you'll know", minutes: 45, why: "A year is too long to steer by. Quarters and weekly numbers tell you early when you're drifting.", skipCost: "", output: "Quarterly priorities and scorecards.", built: true, part: "quarter" },
+  { key: "roles", seq: 12, title: "Who does what", minutes: 45, why: "Every target needs one owner, whether that's a person, an automation or an AI.", skipCost: "", output: "Role cards.", built: true, part: "team" },
   { key: "sign_off", seq: 13, title: "Final review and sign-off", minutes: 60, why: "Targets are agreed, not issued.", skipCost: "", output: "Targets argued and agreed.", checkpoint: true, built: false },
   { key: "lock", seq: 14, title: "Lock the plan", minutes: 20, why: "A locked budget gives you something fair to measure against all year.", skipCost: "", output: "Plan approved and the weekly rhythm started.", built: false },
 ];

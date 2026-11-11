@@ -518,6 +518,7 @@ export async function addTask(formData: FormData) {
     role_id: roleId,
     title: str(formData, "title") ?? "",
     detail: str(formData, "detail"),
+    priority_id: str(formData, "priority_id"),
     route: route ?? "person",
     fallback_route: fallback,
     due_date: str(formData, "due_date"),
@@ -871,4 +872,118 @@ export async function pasteYearRows(formData: FormData) {
     }
   }
   await done(formData, supabase, businessId, "year", error);
+}
+
+
+// ---------- Part 6: this quarter ----------
+
+async function nextPriorityNumber(supabase: SupabaseClient, businessId: string, quarter: string) {
+  const { data } = await supabase.from("quarterly_priorities").select("number").eq("business_id", businessId).eq("quarter_start", quarter);
+  return [1, 2, 3, 4, 5].filter((n) => !(data ?? []).some((p) => p.number === n));
+}
+
+export async function savePriority(formData: FormData) {
+  const businessId = String(formData.get("business_id"));
+  const id = str(formData, "id");
+  const quarter = String(formData.get("quarter_start"));
+  const supabase = await createClient();
+  const objective = str(formData, "objective");
+  if (!objective) return done(formData, supabase, businessId, "quarter", "Write the priority.");
+  const row = {
+    objective,
+    must_win_battle_id: str(formData, "must_win_battle_id"),
+    owner_role_id: str(formData, "owner_role_id"),
+    due_date: str(formData, "due_date"),
+  };
+  let error: string | undefined;
+  if (id) {
+    error = (await supabase.from("quarterly_priorities").update(row).eq("id", id)).error?.message;
+  } else {
+    const free = await nextPriorityNumber(supabase, businessId, quarter);
+    if (!free.length) return done(formData, supabase, businessId, "quarter", "Five is the limit for one quarter. Remove one first.");
+    const pid = randomUUID();
+    const r = await supabase.from("quarterly_priorities").insert({
+      id: pid,
+      business_id: businessId,
+      plan_cycle_id: str(formData, "plan_cycle_id"),
+      quarter_start: quarter,
+      number: free[0],
+      ...row,
+    });
+    error = r.error?.message;
+    const result = str(formData, "result");
+    if (!error && result) {
+      await supabase.from("key_results").insert({
+        business_id: businessId,
+        priority_id: pid,
+        description: result,
+        target: num(formData, "target"),
+        unit: str(formData, "unit"),
+        due_date: str(formData, "due_date"),
+      });
+    }
+  }
+  await done(formData, supabase, businessId, "quarter", error);
+}
+
+export async function removePriority(formData: FormData) {
+  const businessId = String(formData.get("business_id"));
+  const supabase = await createClient();
+  const { error } = await supabase.from("quarterly_priorities").delete().eq("id", String(formData.get("id"))).eq("business_id", businessId);
+  await done(formData, supabase, businessId, "quarter", error?.message);
+}
+
+export async function addKeyResult(formData: FormData) {
+  const businessId = String(formData.get("business_id"));
+  const supabase = await createClient();
+  const { error } = await supabase.from("key_results").insert({
+    business_id: businessId,
+    priority_id: String(formData.get("priority_id")),
+    description: str(formData, "description") ?? "",
+    target: num(formData, "target"),
+    unit: str(formData, "unit"),
+    due_date: str(formData, "due_date"),
+  });
+  await done(formData, supabase, businessId, "quarter", error?.message);
+}
+
+export async function updateKeyResult(formData: FormData) {
+  const businessId = String(formData.get("business_id"));
+  const supabase = await createClient();
+  const id = String(formData.get("id"));
+  const { error } =
+    formData.get("remove") === "1"
+      ? await supabase.from("key_results").delete().eq("id", id).eq("business_id", businessId)
+      : await supabase.from("key_results").update({ current_value: num(formData, "current_value"), updated_at: new Date().toISOString() }).eq("id", id);
+  await done(formData, supabase, businessId, "quarter", error?.message);
+}
+
+export async function pastePriorities(formData: FormData) {
+  const businessId = String(formData.get("business_id"));
+  const quarter = String(formData.get("quarter_start"));
+  const supabase = await createClient();
+  const free = await nextPriorityNumber(supabase, businessId, quarter);
+  const rows = pastedRows(str(formData, "rows"), 5)
+    .filter((c) => !/^priority$/i.test(c[0]))
+    .slice(0, free.length);
+  let error: string | undefined;
+  if (!rows.length) error = free.length ? "Nothing to add. Paste one priority per line." : "Five is the limit for one quarter. Remove one first.";
+  for (let i = 0; i < rows.length && !error; i++) {
+    const c = rows[i];
+    const pid = randomUUID();
+    const r = await supabase.from("quarterly_priorities").insert({
+      id: pid,
+      business_id: businessId,
+      plan_cycle_id: str(formData, "plan_cycle_id"),
+      quarter_start: quarter,
+      number: free[i],
+      objective: c[0],
+      due_date: parseDate(c[4]),
+    });
+    error = r.error?.message;
+    if (!error && c[1]) {
+      await supabase.from("key_results").insert({ business_id: businessId, priority_id: pid, description: c[1], target: parseNum(c[2]), unit: c[3] || null, due_date: parseDate(c[4]) });
+    }
+  }
+  await done(formData, supabase, businessId, "quarter", error);
 }

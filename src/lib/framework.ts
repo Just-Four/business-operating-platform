@@ -81,8 +81,8 @@ export const PARTS: Part[] = [
     num: 6,
     slug: "quarter",
     title: "This quarter",
-    summary: "Three to five priorities, each with measurable key results.",
-    built: false,
+    summary: "Three to five priorities, each with an owner, a number that shows it's done, and tasks.",
+    built: true,
     stages: { launch: "on", early_revenue: "on", established: "on" },
   },
   {

@@ -53,7 +53,7 @@ export default async function SessionPage({
     ? await supabase.from("ai_reviews").select("id, content, created_at, responses").eq("business_id", id).eq("kind", "checkpoint").eq("session_key", key).order("created_at", { ascending: false }).limit(1).maybeSingle()
     : { data: null };
   const [{ data: biz }, { data: row }, { data: me }, { data: canvas }, { data: evidence }, { data: diag }] = await Promise.all([
-    supabase.from("businesses").select("name, model, stage, currency").eq("id", id).single(),
+    supabase.from("businesses").select("name, model, stage, currency, planning_route").eq("id", id).single(),
     supabase.from("programme_sessions").select("scheduled_on, completed_at, approved_at, review_type, reviewer_name, reviewer_role, review_notes").eq("business_id", id).eq("key", key).maybeSingle(),
     supabase.from("memberships").select("role").eq("business_id", id).eq("user_id", user?.id ?? "").maybeSingle(),
     supabase.from("canvas_boxes").select("box, answer").eq("business_id", id),
@@ -91,16 +91,27 @@ export default async function SessionPage({
   const prev = [...visible].reverse().find((s) => s.seq < session.seq);
   const next = visible.find((s) => s.seq > session.seq);
   const here = `/b/${id}/s/${key}`;
+  // Businesses that went straight to the board aren't on a programme, so session numbers mean nothing to them.
+  const standalone = biz?.planning_route === "board";
 
   return (
     <div className="max-w-3xl">
       <Notice error={error} saved={saved} />
-      <p className="hint">
-        Session {visible.findIndex((s) => s.key === key) + 1} of {visible.length}, about {session.minutes} minutes
-        {row?.scheduled_on ? `, planned for ${row.scheduled_on}` : ""}
-        {row?.completed_at ? ", done" : ""}
-      </p>
-      <h1 className="text-4xl font-bold leading-tight sm:text-5xl">{session.title}</h1>
+      {standalone ? (
+        <p className="hint">{isCheckpoint ? "Plan review" : "Guided step"}</p>
+      ) : (
+        <p className="hint">
+          Session {visible.findIndex((s) => s.key === key) + 1} of {visible.length}, about {session.minutes} minutes
+          {row?.scheduled_on ? `, planned for ${row.scheduled_on}` : ""}
+          {row?.completed_at ? ", done" : ""}
+        </p>
+      )}
+      <h1 className="text-4xl font-bold leading-tight sm:text-5xl">{standalone && key === "sign_off" ? "Get the plan challenged" : session.title}</h1>
+      {isCheckpoint && !row?.approved_at && (
+        <p className="mt-4">
+          <a href="#review-options" className="btn">Go straight to the review</a>
+        </p>
+      )}
 
       <section className="mt-6 border-l-4 border-[var(--wait)] bg-[var(--surface)] p-5" aria-label="Why this matters">
         <h2 className="text-lg font-bold">Why this matters</h2>
@@ -306,7 +317,7 @@ export default async function SessionPage({
             ) : null}
             {row?.approved_at ? null : (
               <div className="space-y-4">
-                <h2 className="text-2xl font-bold">How do you want it challenged?</h2>
+                <h2 id="review-options" className="scroll-mt-6 text-2xl font-bold">How do you want it challenged?</h2>
                 <form action={recordReview} className="card space-y-4 p-5">
                   <input type="hidden" name="business_id" value={id} />
                   <input type="hidden" name="session_key" value={key} />
@@ -394,10 +405,12 @@ export default async function SessionPage({
                   </>
                 )}
 
-                <div className="flex flex-wrap items-center gap-3">
-                  <FinishForm id={id} sessionKey={key} label="Carry on and review later" quiet />
-                  <span className="hint">The plan can&apos;t be signed off until this has been reviewed.</span>
-                </div>
+                {!standalone && (
+                  <div className="flex flex-wrap items-center gap-3">
+                    <FinishForm id={id} sessionKey={key} label="Carry on and review later" quiet />
+                    <span className="hint">The plan can&apos;t be signed off until this has been reviewed.</span>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -495,7 +508,7 @@ export default async function SessionPage({
         )}
       </div>
 
-      <nav className="mt-12 flex justify-between border-t border-[var(--line)] pt-4 text-sm" aria-label="Sessions">
+      <nav className={`mt-12 justify-between border-t border-[var(--line)] pt-4 text-sm ${standalone ? "hidden" : "flex"}`} aria-label="Sessions">
         {prev ? <Link href={`/b/${id}/s/${prev.key}`} className="hover:underline">Previous: {sessionTitle(prev.key, biz?.stage)}</Link> : <span />}
         {next ? <Link href={`/b/${id}/s/${next.key}`} className="hover:underline">Next: {sessionTitle(next.key, biz?.stage)}</Link> : <span />}
       </nav>

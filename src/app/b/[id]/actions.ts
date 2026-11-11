@@ -59,6 +59,9 @@ async function completeSessionInternal(supabase: SupabaseClient, businessId: str
       await supabase.from("programme_sessions").update({ scheduled_on: moved }).eq("business_id", businessId).eq("key", r.key);
     }
   }
+  // A business that went straight to the board has no programme: go back to the plan.
+  const { data: bizRoute } = await supabase.from("businesses").select("planning_route").eq("id", businessId).single();
+  if (bizRoute?.planning_route === "board") return `/b/${businessId}/year?saved=1#lock`;
   // Next session within this business's own programme (short programmes skip steps).
   const inProgramme = new Set((rows ?? []).map((r) => r.key));
   const next = SESSIONS.filter((x) => x.seq > seq && (inProgramme.size === 0 || inProgramme.has(x.key))).sort((a, b) => a.seq - b.seq)[0];

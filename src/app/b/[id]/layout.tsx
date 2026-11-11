@@ -79,6 +79,17 @@ export default async function BusinessLayout({
           )}
           <nav className="mt-6 flex-1" aria-label={guided ? "Programme sessions" : "Plan parts"}>
             <SideRoute businessId={id} stops={guided ? sessionStops : stops} />
+            {!guided && (
+              <div className="mt-6 space-y-2 text-sm">
+                <Link href={`/b/${id}/s/sign_off`} className="block rounded border border-[var(--wait)] px-3 py-2 font-semibold hover:bg-white/10">
+                  Get the plan challenged
+                  <span className="block font-normal text-white/70">AI review, or record someone else&apos;s</span>
+                </Link>
+                <Link href={`/b/${id}/year#lock`} className="block rounded border border-white/25 px-3 py-2 hover:bg-white/10">
+                  Lock the plan
+                </Link>
+              </div>
+            )}
             {guided && (
               <details className="mt-6 text-sm text-white/80">
                 <summary className="cursor-pointer hover:text-white">View the plan by part</summary>

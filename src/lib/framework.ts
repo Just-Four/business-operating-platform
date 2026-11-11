@@ -197,9 +197,13 @@ export function weekStart(d = new Date()) {
 }
 
 export function ragOf(value: number | null | undefined, target: number | null | undefined, betterWhen: string) {
-  if (value === null || value === undefined || target === null || target === undefined || target === 0) return "none";
-  const ratio = betterWhen === "lower" ? target / Math.max(value, 0.0001) : value / target;
-  if (ratio >= 1) return "green";
-  if (ratio >= 0.9) return "amber";
-  return "red";
+  if (value === null || value === undefined || target === null || target === undefined) return "none";
+  if (betterWhen === "lower") {
+    if (value <= target) return "green";
+    if (target === 0) return "red";
+    return target / value >= 0.9 ? "amber" : "red";
+  }
+  if (value >= target) return "green";
+  if (target === 0) return "red";
+  return value / target >= 0.9 ? "amber" : "red";
 }

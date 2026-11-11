@@ -19,6 +19,7 @@ const TASK_STATUS: Record<string, { label: string; tone: string }> = {
   in_progress: { label: "In progress", tone: "wait" },
   blocked: { label: "Blocked", tone: "stop" },
   awaiting_approval: { label: "Waiting for approval", tone: "wait" },
+  awaiting_review: { label: "Result to check", tone: "wait" },
   done: { label: "Done", tone: "go" },
   failed: { label: "Failed", tone: "stop" },
   escalated: { label: "Handed to fallback", tone: "stop" },

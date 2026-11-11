@@ -102,7 +102,7 @@ export default async function TeamPage({
   const [{ data: roles }, { data: measures }, { data: tasks }] = await Promise.all([
     supabase.from("roles").select("*").eq("business_id", id).eq("active", true).order("created_at"),
     supabase.from("measures").select("id, role_id").eq("business_id", id).eq("active", true),
-    supabase.from("tasks").select("id, role_id, status").eq("business_id", id).in("status", ["queued", "in_progress", "blocked", "escalated", "awaiting_approval"]),
+    supabase.from("tasks").select("id, role_id, status").eq("business_id", id).in("status", ["queued", "in_progress", "blocked", "escalated", "awaiting_approval", "awaiting_review"]),
   ]);
   const list = (roles ?? []) as Role[];
 

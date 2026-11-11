@@ -86,7 +86,7 @@ export default async function ReviewsPage({
   const doneInMonth = all.filter((t) => t.status === "done" && t.updated_at >= month && t.updated_at < monthEnd);
   const stuck = all.filter((t) => ["blocked", "failed", "escalated"].includes(t.status));
   const overdue = all.filter((t) => t.due_date && t.due_date < today && !["done", "cancelled"].includes(t.status));
-  const waiting = all.filter((t) => t.needs_approval && !t.approved_at && !["done", "cancelled"].includes(t.status));
+  const waiting = all.filter((t) => (t.needs_approval && !t.approved_at && !["done", "cancelled"].includes(t.status)) || t.status === "awaiting_review");
   const lateMilestones = (milestones ?? []).filter((x) => x.due_date && x.due_date < today && x.status !== "met");
   const offBattles = (battles ?? []).filter((x) => ["at_risk", "off_track", "lost"].includes(x.status));
   const nothing = !(measures ?? []).length && !(battles ?? []).length && !all.length && !(priorities ?? []).length;

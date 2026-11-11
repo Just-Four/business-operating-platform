@@ -1,8 +1,14 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { addTask, updateTask, createAgentKey, revokeAgentKey } from "../actions";
+import { approveResult, runWithClaude, sendBack } from "../process-actions";
 import Notice from "@/components/Notice";
+import AutoRefresh from "@/components/AutoRefresh";
+import PendingButton from "@/components/PendingButton";
 import { ROUTES } from "@/lib/framework";
+import { CLAUDE_STALE_MINUTES } from "@/lib/process";
+
+export const maxDuration = 300;
 
 type Task = {
   id: string;
@@ -21,6 +27,11 @@ type Task = {
   cost: number;
   claimed_by: string | null;
   updated_at: string;
+  process_run_id: string | null;
+  step_seq: number | null;
+  review_required: boolean;
+  review_note: string | null;
+  rejections: number;
 };
 
 const STATUS: Record<string, { label: string; tone: string }> = {
@@ -28,6 +39,7 @@ const STATUS: Record<string, { label: string; tone: string }> = {
   in_progress: { label: "In progress", tone: "wait" },
   blocked: { label: "Blocked", tone: "stop" },
   awaiting_approval: { label: "Waiting for approval", tone: "wait" },
+  awaiting_review: { label: "Result to check", tone: "wait" },
   done: { label: "Done", tone: "go" },
   failed: { label: "Failed", tone: "stop" },
   escalated: { label: "Handed to fallback", tone: "stop" },
@@ -57,25 +69,36 @@ export default async function TasksPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ error?: string; saved?: string; role?: string; newkey?: string }>;
+  searchParams: Promise<{ error?: string; saved?: string; role?: string; newkey?: string; run?: string }>;
 }) {
   const { id } = await params;
-  const { error, saved, role, newkey } = await searchParams;
+  const { error, saved, role, newkey, run } = await searchParams;
   const supabase = await createClient();
   let tq = supabase.from("tasks").select("*").eq("business_id", id).order("due_date", { ascending: true, nullsFirst: false }).order("created_at");
   if (role) tq = tq.eq("role_id", role);
-  const [{ data: roles }, { data: tasks }, { data: events }, { data: keys }] = await Promise.all([
+  if (run) tq = tq.eq("process_run_id", run);
+  const [{ data: roles }, { data: tasks }, { data: events }, { data: keys }, { data: runInfo }] = await Promise.all([
     supabase.from("roles").select("id, name, route").eq("business_id", id).eq("active", true).order("created_at"),
     tq,
     supabase.from("task_events").select("task_id, event, actor, detail, created_at").eq("business_id", id).order("created_at", { ascending: false }).limit(500),
     supabase.from("agent_keys").select("id, label, route, key_hint, created_at, revoked_at").eq("business_id", id).order("created_at"),
+    run
+      ? supabase.from("process_runs").select("id, subject, process_id, status, processes(name)").eq("id", run).eq("business_id", id).maybeSingle()
+      : Promise.resolve({ data: null }),
   ]);
   const all = (tasks ?? []) as Task[];
   const roleName = (rid: string | null) => roles?.find((r) => r.id === rid)?.name ?? "No role";
   const closed = ["done", "cancelled"];
+  const toCheck = all.filter((t) => t.status === "awaiting_review");
   const approval = all.filter((t) => t.needs_approval && !t.approved_at && !closed.includes(t.status));
   const attention = all.filter((t) => ["blocked", "failed", "escalated"].includes(t.status) && !approval.includes(t));
   const active = all.filter((t) => ["queued", "in_progress"].includes(t.status) && !approval.includes(t));
+  const now = Date.now();
+  const claudeWorking = (t: Task) => t.route === "claude" && t.status === "in_progress" && now - new Date(t.updated_at).getTime() < CLAUDE_STALE_MINUTES * 60_000;
+  const anyWorking = all.some(claudeWorking);
+  const runName = (runInfo as { subject: string | null; processes: { name: string } | { name: string }[] | null } | null) ?? null;
+  const runProcess = runName ? (Array.isArray(runName.processes) ? runName.processes[0]?.name : runName.processes?.name) : null;
+  const here = `/b/${id}/tasks${run ? `?run=${run}` : role ? `?role=${role}` : ""}`;
   const finished = all.filter((t) => closed.includes(t.status)).sort((a, b) => b.updated_at.localeCompare(a.updated_at)).slice(0, 15);
   const today = new Date().toISOString().slice(0, 10);
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -85,8 +108,10 @@ export default async function TasksPage({
     const history = (events ?? []).filter((e) => e.task_id === t.id);
     const overdue = t.due_date && t.due_date < today && !closed.includes(t.status);
     const waiting = t.needs_approval && !t.approved_at;
+    const working = claudeWorking(t);
+    const toClaude = t.route === "claude" && !working && !waiting && ["queued", "in_progress", "failed", "escalated", "blocked"].includes(t.status);
     return (
-      <article className="card p-4">
+      <article className="card p-4" id={`task-${t.id}`}>
         <div className="flex flex-wrap items-start gap-x-4 gap-y-2">
           <div className="min-w-0 flex-1">
             <h3 className="text-lg font-semibold leading-snug">{t.title}</h3>
@@ -94,6 +119,7 @@ export default async function TasksPage({
               {roleName(t.role_id)}
               {t.due_date ? `, due ${day(t.due_date)}` : ""}
               {t.claimed_by ? `, picked up by ${t.claimed_by}` : ""}
+              {t.step_seq ? `, step ${t.step_seq} of a process` : ""}
               {t.attempts > 1 ? `, ${t.attempts} attempts` : ""}
               {Number(t.cost) > 0 ? `, cost ${Number(t.cost).toLocaleString("en-GB", { maximumFractionDigits: 2 })}` : ""}
             </p>
@@ -114,10 +140,49 @@ export default async function TasksPage({
             )}
           </div>
         )}
+        {working && (
+          <p className="mt-3 rounded bg-[var(--wait-tint)] p-3 text-sm">
+            <span className="font-semibold">Claude is working on this.</span> The result will appear here. This page refreshes itself.
+          </p>
+        )}
+        {t.status === "queued" && t.review_note && (
+          <div className="mt-3 rounded border border-[var(--wait)] bg-[var(--wait-tint)] p-3 text-sm">
+            <p className="font-semibold">Sent back{t.rejections > 1 ? ` (${t.rejections} times)` : ""}</p>
+            <p className="whitespace-pre-line">{t.review_note}</p>
+          </div>
+        )}
         {t.status === "escalated" && t.fallback_route && (
           <p className="mt-3 text-sm">The first route couldn&apos;t finish this, so it has moved to {ROUTES[t.route]?.label ?? t.route}.</p>
         )}
-        {!closed.includes(t.status) && (
+        {t.status === "awaiting_review" && (
+          <div className="mt-4 space-y-3 border-t border-[var(--line)] pt-4">
+            <p className="text-sm font-semibold">Check this against the standard before the next step starts.</p>
+            <div className="flex flex-wrap items-end gap-3">
+              <form action={approveResult}>
+                <input type="hidden" name="business_id" value={id} />
+                <input type="hidden" name="task_id" value={t.id} />
+                <input type="hidden" name="return_to" value={here} />
+                <button className="btn">Approve result</button>
+              </form>
+              <form action={sendBack} className="flex min-w-0 flex-1 flex-wrap items-end gap-2">
+                <input type="hidden" name="business_id" value={id} />
+                <input type="hidden" name="task_id" value={t.id} />
+                <input type="hidden" name="return_to" value={here} />
+                <input className="input min-w-48 flex-1" name="note" required aria-label="What needs fixing" placeholder="What needs fixing" />
+                <button className="btn btn-secondary">Send back</button>
+              </form>
+            </div>
+          </div>
+        )}
+        {toClaude && (
+          <form action={runWithClaude} className="mt-4">
+            <input type="hidden" name="business_id" value={id} />
+            <input type="hidden" name="task_id" value={t.id} />
+            <input type="hidden" name="return_to" value={here} />
+            <PendingButton label={t.rejections > 0 ? "Run with Claude again" : t.status === "failed" ? "Try Claude again" : "Run with Claude"} pending="Starting..." />
+          </form>
+        )}
+        {!closed.includes(t.status) && t.status !== "awaiting_review" && (
           <div className="mt-4 flex flex-wrap items-end gap-2">
             {waiting && <Act id={id} task={t.id} action="approve" label="Approve" />}
             {!waiting && t.route === "person" && t.status !== "in_progress" && <Act id={id} task={t.id} action="start" label="Start" quiet />}
@@ -142,7 +207,7 @@ export default async function TasksPage({
               {history.map((e, i) => (
                 <li key={i}>
                   <span className="text-[var(--muted)]">{when(e.created_at)}</span> {e.actor}: {e.event}
-                  {e.detail ? `, ${e.detail}` : ""}
+                  {e.detail ? `, ${e.detail.length > 240 ? `${e.detail.slice(0, 240)}...` : e.detail}` : ""}
                 </li>
               ))}
             </ol>
@@ -172,8 +237,16 @@ export default async function TasksPage({
   return (
     <div className="max-w-4xl">
       <Notice error={error} saved={saved} />
+      {anyWorking && <AutoRefresh />}
       <p className="hint">Run</p>
       <h1 className="text-4xl font-bold leading-none sm:text-5xl">Tasks</h1>
+      {run && (
+        <p className="mt-2 text-sm">
+          Showing one run{runProcess ? ` of ${runProcess}` : ""}
+          {runName?.subject ? `: ${runName.subject}` : ""}.{" "}
+          <Link className="underline underline-offset-4" href={`/b/${id}/tasks`}>Show all tasks</Link>
+        </p>
+      )}
       <p className="mt-3 max-w-2xl text-[var(--muted)]">
         Work handed to a person, an AI agent or an automation. Each task follows its role&apos;s route. If that route
         fails, it moves to the fallback. Anything that touches an approval gate waits here until someone approves it.
@@ -235,6 +308,7 @@ export default async function TasksPage({
       </details>
 
       {all.length === 0 && <p className="mt-6 text-[var(--muted)]">No tasks yet.</p>}
+      <Section title="Results to check" hint="Claude or another agent has done the step. Approve it to start the next one, or send it back with what to fix." items={toCheck} />
       <Section title="Needs your approval" hint="Nothing happens on these until someone approves." items={approval} />
       <Section title="Needs attention" hint="Blocked, failed or handed to the fallback route." items={attention} />
       <Section title="In the queue" hint="Waiting to be picked up, or being worked on." items={active} />

@@ -53,6 +53,9 @@ export default async function LoginPage({
               <button className="btn btn-secondary" formAction={signUp}>Create account</button>
             </div>
           </form>
+          <p className="hint mt-6">
+            <a className="underline underline-offset-4" href="/privacy">What is stored about you, and who can see it</a>
+          </p>
         </div>
       </div>
     </main>

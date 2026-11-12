@@ -42,6 +42,7 @@ export default async function PortfolioPage({
     supabase.from("processes").select("business_id").in("business_id", ids.length ? ids : none),
   ]);
   const first = list.length === 0;
+  const { data: isOwner } = await supabase.rpc("is_platform_admin");
 
   return (
     <>
@@ -70,6 +71,11 @@ export default async function PortfolioPage({
           <div className="mb-6">
             <h1 className="text-4xl font-bold leading-none sm:text-5xl">Your businesses</h1>
             <p className="mt-3 text-[var(--muted)]">Open one to see the next thing to do in it.</p>
+            {isOwner && (
+              <p className="mt-3 text-sm">
+                <Link className="font-semibold underline underline-offset-4" href="/owner">Everyone using the platform</Link>
+              </p>
+            )}
           </div>
         )}
 

@@ -21,3 +21,22 @@ export async function createBusiness(formData: FormData) {
   revalidatePath("/");
   redirect(`/b/${id}/start`);
 }
+
+// The platform's owner opens someone's business to read it. The database checks who is asking.
+export async function ownerOpenBusiness(formData: FormData) {
+  const supabase = await createClient();
+  const id = String(formData.get("business_id"));
+  const { data, error } = await supabase.rpc("admin_view_business", { p_business: id });
+  if (error || !data) redirect(`/owner?error=${encodeURIComponent(error?.message ?? "That didn't work.")}`);
+  revalidatePath("/");
+  redirect(`/b/${id}`);
+}
+
+export async function ownerStopViewing(formData: FormData) {
+  const supabase = await createClient();
+  const id = String(formData.get("business_id"));
+  const { data, error } = await supabase.rpc("admin_stop_viewing", { p_business: id });
+  if (error || !data) redirect(`/owner?error=${encodeURIComponent(error?.message ?? "That didn't work.")}`);
+  revalidatePath("/");
+  redirect("/owner");
+}

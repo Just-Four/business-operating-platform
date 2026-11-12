@@ -375,7 +375,7 @@ export default async function TasksPage({
     <div className="max-w-4xl">
       <Notice error={error} saved={saved} />
       {anyWorking && <AutoRefresh />}
-      <p className="hint">Stage 3: Run</p>
+      <p className="hint">Stage 4: Run</p>
       <h1 className="text-4xl font-bold leading-none sm:text-5xl">Tasks</h1>
       {run && (
         <p className="mt-2 text-sm">

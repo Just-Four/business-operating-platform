@@ -37,7 +37,7 @@ export default async function BusinessHome({
       <Notice error={error} saved={saved} />
       <h1 className="text-4xl font-bold leading-none sm:text-5xl">{biz?.name}</h1>
       <p className="mt-3 max-w-2xl text-[var(--muted)]">
-        Four stages, in order: plan the business, build the work that repeats, run it, review it. This page always shows the next thing to do.
+        Five stages, in order: design the business, build how it works, plan the year and the money, run it, review it. This page always shows the next thing to do.
       </p>
 
       <section className="card mt-6 border-2 border-[var(--ink)] p-6" aria-labelledby="next-heading">
@@ -75,7 +75,7 @@ export default async function BusinessHome({
                 <h2 id={`stage-${s.key}`} className="text-2xl font-bold leading-tight">
                   {s.title}
                   <span className="tag ml-3 align-middle" data-tone={STATE_TAG[s.state].tone}>
-                    {STATE_TAG[s.state].text}
+                    {s.tagText ?? STATE_TAG[s.state].text}
                   </span>
                 </h2>
                 <p className="mt-1 max-w-2xl text-sm">{s.purpose}</p>
@@ -88,13 +88,15 @@ export default async function BusinessHome({
                 </Link>
               )}
             </div>
-            {s.key === "plan" && journey.guided ? (
+            {(s.key === "design" || s.key === "plan") && journey.guided ? (
               <details className="border-t border-[var(--line)]">
-                <summary className="cursor-pointer px-5 py-3 text-sm text-[var(--muted)]">See the plan so far, part by part</summary>
+                <summary className="cursor-pointer px-5 py-3 text-sm text-[var(--muted)]">See what&apos;s written so far, part by part</summary>
                 <Rows rows={s.rows} />
-                <p className="border-t border-[var(--line)] px-5 py-3 text-sm">
-                  <Link className="underline underline-offset-4" href={`/b/${id}/programme`}>All planning sessions and their dates</Link>
-                </p>
+                {s.key === "design" && (
+                  <p className="border-t border-[var(--line)] px-5 py-3 text-sm">
+                    <Link className="underline underline-offset-4" href={`/b/${id}/programme`}>All planning sessions and their dates</Link>
+                  </p>
+                )}
               </details>
             ) : (
               <div className="border-t border-[var(--line)]">

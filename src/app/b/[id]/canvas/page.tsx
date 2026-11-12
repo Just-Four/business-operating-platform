@@ -32,7 +32,7 @@ export default async function CanvasPage({
   return (
     <div>
       <Notice error={error} saved={saved} />
-      <p className="hint">Stage 1: Plan, part 1 of 6</p>
+      <p className="hint">Stage 1: Design, part 1 of 3</p>
       <h1 className="text-4xl font-bold leading-none sm:text-5xl">Business model</h1>
       <p className="mt-3 max-w-2xl text-[var(--muted)]">
         What the business is and how it makes money, on one board. Start on the right with customers, work left to what

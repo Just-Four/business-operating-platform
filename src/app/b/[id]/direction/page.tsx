@@ -31,7 +31,7 @@ export default async function DirectionPage({
           <Link href={`/b/${id}/s/${session}`} className="font-semibold underline underline-offset-4">Back to the session</Link>
         </p>
       )}
-      <p className="hint">Stage 1: Plan, part 3 of 6</p>
+      <p className="hint">Stage 1: Design, part 3 of 3</p>
       <h1 className="text-4xl font-bold leading-none sm:text-5xl">Direction</h1>
       <p className="mt-3 text-[var(--muted)]">
         Where the business is going over three horizons.

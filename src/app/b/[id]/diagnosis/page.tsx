@@ -28,7 +28,7 @@ export default async function DiagnosisPage({
   return (
     <div className="max-w-3xl">
       <Notice error={error} saved={saved} />
-      <p className="hint">Stage 1: Plan, part 2 of 6</p>
+      <p className="hint">Stage 1: Design, part 2 of 3</p>
       <h1 className="text-4xl font-bold leading-none sm:text-5xl">Diagnosis</h1>
       <p className="mt-3 text-[var(--muted)]">
         Name the one challenge that decides whether this business succeeds, before setting a single goal.

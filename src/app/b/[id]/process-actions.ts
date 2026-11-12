@@ -9,6 +9,7 @@ import { createClient } from "@/lib/supabase/server";
 import { CLAUDE_STALE_MINUTES, parseAssessment } from "@/lib/process";
 import { CLAUDE_LABEL, finishClaudeTask } from "@/lib/agent";
 import { afterStepPath } from "@/lib/next-step";
+import { MOMENTS } from "@/lib/story";
 
 const ROUTE_KEYS = ["person", "grok_bot", "claude", "n8n", "cheap_model"];
 
@@ -76,6 +77,43 @@ async function renumber(supabase: SupabaseClient, processId: string) {
     if (s.seq !== n) await supabase.from("process_steps").update({ seq: n }).eq("id", s.id);
     n += 1;
   }
+}
+
+// ---------- How the business works ----------
+
+export async function saveStory(formData: FormData) {
+  const businessId = String(formData.get("business_id"));
+  const supabase = await createClient();
+  const rows = MOMENTS.map((m) => ({
+    business_id: businessId,
+    moment: m.key,
+    what_happens: str(formData, `what_${m.key}`),
+    who: str(formData, `who_${m.key}`),
+    needs: str(formData, `needs_${m.key}`),
+    updated_at: new Date().toISOString(),
+  }));
+  const { error } = await supabase.from("story_points").upsert(rows, { onConflict: "business_id,moment" });
+  back(formData, businessId, "story", error?.message);
+}
+
+// One moment of the customer's journey becomes a process, ready for its steps.
+export async function storyToProcess(formData: FormData) {
+  const businessId = String(formData.get("business_id"));
+  const moment = String(formData.get("moment"));
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const name = str(formData, "name");
+  if (!name) back(formData, businessId, "story", "Give the process a name.");
+  const { data: point } = await supabase.from("story_points").select("what_happens").eq("business_id", businessId).eq("moment", moment).maybeSingle();
+  const id = randomUUID();
+  const { error } = await supabase.from("processes").insert({ id, business_id: businessId, name, purpose: point?.what_happens ?? null, created_by: user?.id ?? null });
+  if (error) back(formData, businessId, "story", error.message);
+  await snapshot(supabase, id, false, "Created from how the business works");
+  await supabase.from("story_points").update({ process_id: id }).eq("business_id", businessId).eq("moment", moment);
+  revalidatePath(`/b/${businessId}`, "layout");
+  redirect(`/b/${businessId}/processes/${id}`);
 }
 
 // ---------- Procedures ----------

@@ -77,7 +77,7 @@ export default async function RhythmPage({
   return (
     <div className="max-w-4xl">
       <Notice error={error} saved={saved} />
-      <p className="hint">Stage 4: Review</p>
+      <p className="hint">Stage 5: Review</p>
       <h1 className="text-4xl font-bold leading-none sm:text-5xl">Meetings</h1>
       <p className="mt-3 max-w-2xl text-[var(--muted)]">
         A plan only works if someone looks at it on a fixed beat. These are the few standing meetings that keep it alive.

@@ -93,7 +93,7 @@ export default async function ScorecardsPage({
           <Link href={`/b/${id}/s/${session}`} className="font-semibold underline underline-offset-4">Back to the session</Link>
         </p>
       )}
-      <p className="hint">Stage 3: Run</p>
+      <p className="hint">Stage 4: Run</p>
       <h1 className="text-4xl font-bold leading-none sm:text-5xl">Scorecards</h1>
       <p className="mt-3 max-w-2xl text-[var(--muted)]">
         A few numbers per role, checked every week. Lead measures are the activity you control. Lag measures are the

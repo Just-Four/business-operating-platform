@@ -111,6 +111,10 @@ export const SESSIONS: Session[] = [
   { key: "lock", seq: 14, title: "Lock the plan", minutes: 20, why: "A locked budget gives you something fair to measure against all year.", skipCost: "", output: "The plan locked and the weekly rhythm started.", built: true, part: "year" },
 ];
 
+// Guided sessions by stage. "roles" belongs to Build, where the Team and Roles pages cover it.
+export const DESIGN_SESSIONS = ["commit", "who_pays", "deliver_money", "evidence", "diagnosis", "checkpoint_1", "direction"];
+export const PLAN_SESSIONS = ["launch_path", "battles", "numbers", "quarter", "sign_off", "lock"];
+
 export function sessionByKey(key: string) {
   return SESSIONS.find((s) => s.key === key);
 }

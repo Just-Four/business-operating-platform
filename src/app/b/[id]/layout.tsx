@@ -3,10 +3,10 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { MODELS, STAGES, STATE_LABELS, type Stage } from "@/lib/framework";
 import { getProgress } from "@/lib/progress";
-import { SESSIONS, sessionTitle } from "@/lib/programme";
+import { DESIGN_SESSIONS, PLAN_SESSIONS, SESSIONS, sessionTitle } from "@/lib/programme";
 import { type RouteStop } from "@/components/SideRoute";
 import SideNav from "@/components/SideNav";
-import { getNeeds, planParts } from "@/lib/journey";
+import { designParts, getNeeds, yearParts } from "@/lib/journey";
 import { signOut } from "@/app/login/actions";
 
 export default async function BusinessLayout({
@@ -47,21 +47,20 @@ export default async function BusinessLayout({
     };
   });
 
-  const stops: RouteStop[] = planParts(stage).map((p) => {
-    const s = p.stages[stage];
-    return {
-      num: p.num,
-      slug: p.slug,
-      title: p.title,
-      state: progress.states[p.slug] ?? "empty",
-      note: s === "on" ? undefined : STATE_LABELS[s],
-    };
-  });
+  const partStops = (parts: ReturnType<typeof designParts>): RouteStop[] =>
+    parts.map((p, i) => {
+      const s = p.stages[stage];
+      return { num: i + 1, slug: p.slug, title: p.title, state: progress.states[p.slug] ?? "empty", note: s === "on" ? undefined : STATE_LABELS[s] };
+    });
+  const pick = (keys: string[]) => sessionStops.filter((s) => keys.includes(s.slug.slice(2))).map((s, i) => ({ ...s, num: i + 1 }));
+  const designStops = guided && pick(DESIGN_SESSIONS).length ? pick(DESIGN_SESSIONS) : partStops(designParts(stage));
+  const planStops = guided && pick(PLAN_SESSIONS).length ? pick(PLAN_SESSIONS) : partStops(yearParts(stage));
+  const note = (stops: RouteStop[]) => {
+    const n = stops.filter((s) => s.state === "complete").length;
+    return `${n} of ${stops.length} ${stops[0]?.slug.startsWith("s/") ? "sessions done" : "parts complete"}`;
+  };
   const needs = await getNeeds(supabase, id);
   const waiting = needs.filter((n) => n.acts).length;
-  const sessionsDone = sessionStops.filter((s) => s.state === "complete").length;
-  const partsDone = stops.filter((s) => s.state === "complete").length;
-  const planNote = guided ? `${sessionsDone} of ${sessionStops.length} sessions done` : `${partsDone} of ${stops.length} parts complete`;
 
   return (
     <div className="min-h-screen lg:flex">
@@ -79,7 +78,7 @@ export default async function BusinessLayout({
               {STAGES[stage]}
             </span>
           </Link>
-          <SideNav businessId={id} guided={guided} planStops={guided ? sessionStops : stops} planNote={planNote} waiting={waiting} />
+          <SideNav businessId={id} guided={guided} designStops={designStops} designNote={note(designStops)} planStops={planStops} planNote={note(planStops)} waiting={waiting} />
           <div className="mt-8 border-t border-white/15 pt-4 text-sm">
             <p className="truncate text-white/60">{user?.email}</p>
             <form action={signOut}>

@@ -63,7 +63,7 @@ export default async function DashboardPage({ params, searchParams }: { params: 
   return (
     <div className="max-w-5xl">
       {working.length > 0 && <AutoRefresh />}
-      <p className="hint">Stage 3: Run</p>
+      <p className="hint">Stage 4: Run</p>
       <h1 className="text-4xl font-bold leading-none sm:text-5xl">Dashboard</h1>
       <p className="mt-3 max-w-2xl text-[var(--muted)]">
         What needs you now, then how each process is going. Each line has one button that says what to do.

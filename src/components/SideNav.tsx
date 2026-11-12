@@ -3,28 +3,35 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import SideRoute, { type RouteStop } from "@/components/SideRoute";
+import { DESIGN_SESSIONS, PLAN_SESSIONS } from "@/lib/programme";
 
-const PLAN_PAGES = ["canvas", "diagnosis", "direction", "launch", "year", "quarter", "programme", "start"];
+const DESIGN_PAGES = ["canvas", "diagnosis", "direction", "programme", "start"];
+const PLAN_PAGES = ["launch", "year", "quarter"];
 
-// The left menu: the dashboard on top, then the four stages in order.
+// The left menu: home and the dashboard on top, then the five stages in order.
 export default function SideNav({
   businessId,
   guided,
+  designStops,
+  designNote,
   planStops,
   planNote,
   waiting,
 }: {
   businessId: string;
   guided: boolean;
+  designStops: RouteStop[];
+  designNote: string;
   planStops: RouteStop[];
   planNote: string;
   waiting: number;
 }) {
   const pathname = usePathname();
   const base = `/b/${businessId}`;
-  const rest = pathname.slice(base.length + 1);
-  const first = rest.split("/")[0];
-  const onPlan = first === "s" || PLAN_PAGES.includes(first);
+  const parts = pathname.slice(base.length + 1).split("/");
+  const first = parts[0];
+  const onDesign = DESIGN_PAGES.includes(first) || (first === "s" && DESIGN_SESSIONS.includes(parts[1]));
+  const onPlan = PLAN_PAGES.includes(first) || (first === "s" && PLAN_SESSIONS.includes(parts[1]));
 
   const Item = ({ href, label, badge }: { href: string; label: string; badge?: number }) => {
     const current = pathname === href || (href !== base && pathname.startsWith(`${href}/`));
@@ -51,34 +58,44 @@ export default function SideNav({
       <Item href={base} label="Home: what to do next" />
       <Item href={`${base}/dashboard`} label="Dashboard" badge={waiting} />
 
-      <Head n={1} title="Plan" />
-      <details key={onPlan ? "open" : "closed"} open={onPlan}>
-        <summary className="cursor-pointer rounded px-2 py-1.5 hover:bg-white/10">{planNote}</summary>
+      <Head n={1} title="Design" />
+      <details key={onDesign ? "design-open" : "design-closed"} open={onDesign}>
+        <summary className="cursor-pointer rounded px-2 py-1.5 hover:bg-white/10">{designNote}</summary>
         <div className="mt-2 pl-1">
-          <SideRoute businessId={businessId} stops={planStops} />
-          <div className="mt-3 space-y-1">
-            {guided ? (
+          <SideRoute businessId={businessId} stops={designStops} />
+          {guided && (
+            <div className="mt-3 space-y-1">
               <Item href={`${base}/programme`} label="All sessions and dates" />
-            ) : (
-              <>
-                <Item href={`${base}/s/sign_off`} label="Have the plan reviewed" />
-                <Link href={`${base}/year#lock`} className="block rounded px-2 py-1.5 hover:bg-white/10">Lock the plan</Link>
-              </>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </details>
 
       <Head n={2} title="Build" />
+      <Item href={`${base}/story`} label="How the business works" />
+      <Item href={`${base}/people`} label="Team" />
       <Item href={`${base}/processes`} label="Processes" />
       <Item href={`${base}/team`} label="Roles" />
-      <Item href={`${base}/people`} label="Team" />
 
-      <Head n={3} title="Run" />
+      <Head n={3} title="Plan" />
+      <details key={onPlan ? "plan-open" : "plan-closed"} open={onPlan}>
+        <summary className="cursor-pointer rounded px-2 py-1.5 hover:bg-white/10">{planNote}</summary>
+        <div className="mt-2 pl-1">
+          <SideRoute businessId={businessId} stops={planStops} />
+          {!guided && (
+            <div className="mt-3 space-y-1">
+              <Item href={`${base}/s/sign_off`} label="Have the plan reviewed" />
+              <Link href={`${base}/year#lock`} className="block rounded px-2 py-1.5 hover:bg-white/10">Lock the plan</Link>
+            </div>
+          )}
+        </div>
+      </details>
+
+      <Head n={4} title="Run" />
       <Item href={`${base}/tasks`} label="Tasks" />
       <Item href={`${base}/scorecards`} label="Scorecards" />
 
-      <Head n={4} title="Review" />
+      <Head n={5} title="Review" />
       <Item href={`${base}/rhythm`} label="Meetings" />
       <Item href={`${base}/reviews`} label="Monthly review" />
     </nav>

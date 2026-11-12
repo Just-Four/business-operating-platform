@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { pasteMembers, saveMember } from "../actions";
 import Notice from "@/components/Notice";
+import NextPart from "@/components/NextPart";
 
 type Member = { id: string; name: string; email: string | null; note: string | null; active: boolean };
 type Role = { id: string; name: string; department: string | null };
@@ -31,7 +32,7 @@ function MemberForm({ businessId, member, roles, held }: { businessId: string; m
         <p className="hint mb-2">Tick as many as they hold. Change these whenever the work moves between people.</p>
         {roles.length === 0 ? (
           <p className="text-sm">
-            No roles yet. <Link className="font-semibold underline underline-offset-4" href={`/b/${businessId}/team`}>Add the roles</Link>
+            No roles yet, and that&apos;s fine. Add the person now. Roles come later, when the work is written down and handed on.
           </p>
         ) : (
           <div className="flex flex-wrap gap-2">
@@ -119,7 +120,7 @@ export default async function PeoplePage({
       {active.length === 0 && (
         <div className="card mt-6 p-4">
           <p className="font-semibold">Nobody is in the team yet.</p>
-          <p className="hint mt-1">Add yourself first, then anyone else who does work in the business.</p>
+          <p className="hint mt-1">Add yourself first. At the start you are the whole team, wearing every hat. Then add anyone else who does work in the business.</p>
         </div>
       )}
       <div className="mt-6 space-y-3">
@@ -168,6 +169,7 @@ export default async function PeoplePage({
           </div>
         </section>
       )}
+      <NextPart businessId={id} slug="people" />
     </div>
   );
 }

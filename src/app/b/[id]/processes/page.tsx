@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import Notice from "@/components/Notice";
-import { STAGE_TEXT } from "@/lib/journey";
 import { addProcess } from "../process-actions";
 
 export default async function ProcessesPage({
@@ -26,7 +25,7 @@ export default async function ProcessesPage({
       <Notice error={error} saved={saved} />
       <p className="hint">Stage 2: Build</p>
       <h1 className="text-4xl font-bold leading-none sm:text-5xl">Processes</h1>
-      <p className="mt-3 max-w-2xl text-[var(--muted)]">{STAGE_TEXT.build.purpose}</p>
+      <p className="mt-3 max-w-2xl text-[var(--muted)]">The work that repeats. Each process is written once as steps, with who or what does each step.</p>
       <ol className="mt-4 grid gap-3 text-sm sm:grid-cols-3">
         {[
           ["1. Write it", "Name a piece of work that repeats, then list its steps."],

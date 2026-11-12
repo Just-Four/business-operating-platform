@@ -13,13 +13,14 @@ export default async function LoginPage({
           <p className="hint">Business Operating Platform</p>
           <h1 className="mt-1 text-4xl font-bold leading-tight sm:text-5xl">Plan your business, then run it from one place.</h1>
           <p className="mt-4 max-w-xl text-[var(--muted)]">
-            You write the plan. You turn it into the work that repeats. People and AI do that work, and you see what needs
-            you. Four stages, in order:
+            You design the business, build how it works, and plan the year. People and AI do the work, and you see what
+            needs you. Five stages, in order:
           </p>
           <ol className="mt-5 space-y-3">
             {[
-              ["Plan", "What the business is, where it's going, and what this year must deliver."],
-              ["Build", "Each piece of repeating work written once as steps, with who or what does each step."],
+              ["Design", "What the business is: who pays, why they'd choose you, and where it's going."],
+              ["Build", "How it works and who does it, then each piece of repeating work written once as steps."],
+              ["Plan", "What this year must deliver and what it will cost."],
               ["Run", "The steps come to the right person or AI. You approve, check and unblock."],
               ["Review", "Look at the numbers on a fixed rhythm and change what isn't working."],
             ].map(([t, d], i) => (

@@ -6,8 +6,9 @@ import { createBusiness } from "./actions";
 import { MODELS, STAGES, type Stage } from "@/lib/framework";
 
 const STAGES_4 = [
-  ["Plan", "Say what the business is, where it's going and what this year must deliver. About two weeks of short sessions, or faster if you already know it."],
-  ["Build", "Write each piece of repeating work once, as steps, and say who or what does each step."],
+  ["Design", "Say what the business is: who pays, why they'd choose you, what stands in the way and where it's going."],
+  ["Build", "Say how it works and who does it. Then write each piece of repeating work once, as steps."],
+  ["Plan", "Say what this year must deliver and what it will cost, and lock it."],
   ["Run", "The steps come to the right person or AI. You approve, check results and unblock."],
   ["Review", "Look at the numbers on a fixed rhythm and change what isn't working."],
 ];
@@ -51,7 +52,7 @@ export default async function PortfolioPage({
             <h1 className="text-4xl font-bold leading-tight sm:text-5xl">Welcome. Start with one business.</h1>
             <p className="mt-3 max-w-2xl text-[var(--muted)]">
               You&apos;ll end up with a written plan, the processes that run the business, and one page showing what needs
-              you. It goes in four stages, and every page tells you the next thing to do.
+              you. It goes in five stages, and every page tells you the next thing to do.
             </p>
             <ol className="mt-6 grid gap-3 sm:grid-cols-2">
               {STAGES_4.map(([t, d], i) => (
@@ -83,7 +84,7 @@ export default async function PortfolioPage({
               ).length;
               const locked = (cycles ?? []).some((c) => c.business_id === b.id && c.status === "approved");
               const nProcs = (procs ?? []).filter((p) => p.business_id === b.id).length;
-              const where = !b.planning_route ? "Not set up yet" : !locked ? "Stage 1: Plan" : nProcs === 0 ? "Stage 2: Build" : "Stage 3: Run";
+              const where = !b.planning_route ? "Not set up yet" : !locked ? "Designing and planning" : nProcs === 0 ? "Stage 2: Build" : "Stage 4: Run";
               return (
                 <li key={b.id}>
                   <Link href={`/b/${b.id}`} className="card flex flex-wrap items-center gap-x-4 gap-y-2 p-5 hover:bg-[#f7f8fa]">
@@ -106,7 +107,7 @@ export default async function PortfolioPage({
 
         <section className={`card max-w-2xl p-6 ${first ? "" : "mt-10"}`}>
           <h2 className="text-xl font-semibold">{first ? "Start your first business" : "Add another business"}</h2>
-          <p className="hint mb-4">Three things now. Then five quick questions decide how the planning works for you.</p>
+          <p className="hint mb-4">Three things now. Then five quick questions decide how the design and planning work for you.</p>
           <form action={createBusiness} className="grid gap-4 sm:grid-cols-2">
             <div className="sm:col-span-2">
               <label className="label" htmlFor="name">What is the business called?</label>

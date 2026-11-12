@@ -348,3 +348,132 @@ h3,
     transition: none !important;
   }
 }
+
+/* The roles drawn as a chart */
+.org-scroll {
+  overflow-x: auto;
+  padding: 1rem 0 0.5rem;
+}
+.org-tree,
+.org-tree ul {
+  display: flex;
+  justify-content: center;
+  margin: 0;
+  padding: 1.25rem 0 0;
+  position: relative;
+  list-style: none;
+}
+.org-tree {
+  padding-top: 0;
+  width: max-content;
+  min-width: 100%;
+  gap: 1.5rem;
+}
+.org-tree li {
+  position: relative;
+  padding: 1.25rem 0.5rem 0;
+  text-align: center;
+}
+.org-tree > li {
+  padding-top: 0;
+}
+/* lines across to brothers and sisters, and up to the parent */
+.org-tree ul li::before,
+.org-tree ul li::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 50%;
+  width: 50%;
+  height: 1.25rem;
+  border-top: 2px solid var(--line);
+}
+.org-tree ul li::after {
+  right: auto;
+  left: 50%;
+  border-left: 2px solid var(--line);
+}
+.org-tree ul li:only-child::before,
+.org-tree ul li:first-child::before,
+.org-tree ul li:last-child::after {
+  border-top: 0;
+}
+.org-tree ul li:only-child::after {
+  border-top: 0;
+}
+.org-tree ul li:last-child::before {
+  border-right: 2px solid var(--line);
+  border-top-right-radius: 6px;
+}
+.org-tree ul li:last-child::after {
+  border-left: 0;
+}
+.org-tree ul li:first-child::after {
+  border-top-left-radius: 6px;
+}
+.org-tree ul li:only-child::before {
+  border-right: 2px solid var(--line);
+  border-radius: 0;
+}
+/* line down from a role that has roles beneath it */
+.org-tree ul::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 50%;
+  height: 1.25rem;
+  border-left: 2px solid var(--line);
+}
+.org-box {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  width: 11.5rem;
+  padding: 0.6rem 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  text-align: left;
+  cursor: grab;
+}
+.org-box:active {
+  cursor: grabbing;
+}
+.org-box[data-dragging="true"] {
+  opacity: 0.45;
+}
+.org-box[data-over="true"] {
+  border-color: var(--go);
+  background: var(--go-tint);
+  box-shadow: 0 0 0 2px var(--go);
+}
+.org-area {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+.org-name {
+  font-weight: 600;
+  line-height: 1.25;
+}
+.org-who {
+  font-size: 13px;
+  color: var(--go);
+}
+.org-who[data-empty="true"] {
+  color: var(--stop);
+}
+.org-top {
+  border: 2px dashed var(--line);
+  border-radius: 6px;
+  padding: 0.6rem 0.8rem;
+  font-size: 13px;
+  color: var(--muted);
+  text-align: center;
+}
+.org-top[data-over="true"] {
+  border-color: var(--go);
+  background: var(--go-tint);
+  color: var(--ink);
+}

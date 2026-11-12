@@ -4,11 +4,13 @@ import { createClient } from "@/lib/supabase/server";
 import { saveRole } from "../actions";
 import Notice from "@/components/Notice";
 import { ROUTES, DEFAULT_GATES, DEPARTMENTS } from "@/lib/framework";
+import OrgChart from "@/components/OrgChart";
 
 type Role = {
   id: string;
   name: string;
   department: string | null;
+  reports_to: string | null;
   purpose: string | null;
   filled_by: string | null;
   route: string;
@@ -40,6 +42,7 @@ function RoleForm({
   members,
   holders,
   areas,
+  others,
 }: {
   businessId: string;
   role?: Role;
@@ -47,6 +50,7 @@ function RoleForm({
   members: Member[];
   holders: string[];
   areas: string[];
+  others: { id: string; name: string }[];
 }) {
   const p = role?.id ?? "new";
   return (
@@ -74,6 +78,15 @@ function RoleForm({
       <div>
         <label className="label" htmlFor={`${p}-purpose`}>What this role is there to get done</label>
         <input className="input" id={`${p}-purpose`} name="purpose" defaultValue={role?.purpose ?? ""} placeholder="Turn enquiries into signed customers" />
+      </div>
+      <div>
+        <label className="label" htmlFor={`${p}-reports_to`}>Reports to</label>
+        <select className="input sm:w-1/2" id={`${p}-reports_to`} name="reports_to" defaultValue={role?.reports_to ?? ""}>
+          <option value="">Nobody: it is at the top</option>
+          {others.map((o) => (
+            <option key={o.id} value={o.id}>{o.name}</option>
+          ))}
+        </select>
       </div>
       <fieldset>
         <legend className="label">Who holds this role now</legend>
@@ -189,9 +202,29 @@ export default async function RolesPage({
         </div>
       )}
 
+      {list.length > 0 && (
+        <section className="mt-8" aria-labelledby="chart-heading">
+          <h2 id="chart-heading" className="display text-2xl font-bold">How the roles fit together</h2>
+          <div className="card mt-3 p-4">
+            <OrgChart
+              businessId={id}
+              roles={list.map((r) => ({
+                id: r.id,
+                name: r.name,
+                area: r.department,
+                reportsTo: r.reports_to,
+                holders: members.filter((m) => (links ?? []).some((l) => l.role_id === r.id && l.member_id === m.id)).map((m) => m.name),
+              }))}
+            />
+          </div>
+          <p className="hint mt-2">On a phone or tablet, open a role in the list below and use &ldquo;Reports to&rdquo; instead of dragging.</p>
+        </section>
+      )}
+
+      {list.length > 0 && <h2 className="display mt-10 text-2xl font-bold">The roles, by area</h2>}
       {groups.map((g) => (
-        <section key={g || "none"} className="mt-8">
-          <h2 className="display text-2xl font-bold">{g || "No area set yet"}</h2>
+        <section key={g || "none"} className="mt-5">
+          <h3 className="display text-xl font-bold">{g || "No area set yet"}</h3>
           {!g && <p className="hint">Open a role and pick its area, such as Sales, Operations or Finance.</p>}
           <div className="mt-3 space-y-3">
             {list
@@ -208,7 +241,7 @@ export default async function RolesPage({
                   <details key={r.id} className="card group p-0">
                     <summary className="flex cursor-pointer flex-wrap items-center gap-x-4 gap-y-2 p-4">
                       <span className="min-w-0 flex-1">
-                        <span className="display block text-xl font-bold">{r.name}</span>
+                        <span className="block text-lg font-semibold">{r.name}</span>
                         <span className="hint block">{r.purpose || "Nothing written yet about what it is there to get done"}</span>
                       </span>
                       <span className="tag" data-tone={holderNames.length ? "go" : "stop"}>{holderNames.length ? holderNames.join(", ") : "Nobody yet"}</span>
@@ -256,7 +289,7 @@ export default async function RolesPage({
                           </>
                         )}
                       </section>
-                      <RoleForm businessId={id} role={r} back={back} members={members} holders={holders} areas={areas} />
+                      <RoleForm businessId={id} role={r} back={back} members={members} holders={holders} areas={areas} others={list.filter((x) => x.id !== r.id)} />
                       <p className="mt-4 flex gap-5 text-sm">
                         <Link className="underline underline-offset-4" href={`/b/${id}/scorecards`}>Scorecard</Link>
                         <Link className="underline underline-offset-4" href={`/b/${id}/tasks?role=${r.id}`}>Tasks</Link>
@@ -272,7 +305,7 @@ export default async function RolesPage({
       <details className="card mt-8 p-0" open={list.length === 0}>
         <summary className="cursor-pointer p-4 font-semibold">Add a role</summary>
         <div className="border-t border-[var(--line)] p-4">
-          <RoleForm businessId={id} back={back} members={members} holders={[]} areas={areas} />
+          <RoleForm businessId={id} back={back} members={members} holders={[]} areas={areas} others={list} />
         </div>
       </details>
       <NextPart businessId={id} slug="team" />

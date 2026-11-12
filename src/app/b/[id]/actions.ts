@@ -484,11 +484,33 @@ export async function saveRole(formData: FormData) {
     approval_gates: gates,
   };
   const { error } = existingId ? await supabase.from("roles").update(row).eq("id", id) : await supabase.from("roles").insert({ id, ...row });
+  if (!error && formData.has("reports_to")) {
+    const loop = await moveRole(businessId, id, str(formData, "reports_to"));
+    if (loop) return done(formData, supabase, businessId, "team", loop);
+  }
   if (!error) {
     await setLinks(supabase, businessId, "role_id", id, formData.getAll("member_id").map(String));
     await syncFilledBy(supabase, businessId);
   }
   await done(formData, supabase, businessId, "team", error?.message);
+}
+
+// Used by the chart: put a role under another role, or at the top (parent null).
+export async function moveRole(businessId: string, roleId: string, parentId: string | null): Promise<string | null> {
+  const supabase = await createClient();
+  const { data: roles } = await supabase.from("roles").select("id, reports_to").eq("business_id", businessId);
+  const byId = new Map((roles ?? []).map((r) => [r.id, r.reports_to as string | null]));
+  if (!byId.has(roleId) || (parentId && !byId.has(parentId))) return "That role wasn't found.";
+  if (parentId === roleId) return "A role can't report to itself.";
+  // Walk up from the new parent: if we meet this role, it would report to one beneath it.
+  let up = parentId;
+  for (let i = 0; up && i < 100; i += 1) {
+    if (up === roleId) return "That would make a role report to one beneath it. Move the lower role first.";
+    up = byId.get(up) ?? null;
+  }
+  const { error } = await supabase.from("roles").update({ reports_to: parentId }).eq("id", roleId).eq("business_id", businessId);
+  revalidatePath(`/b/${businessId}`, "layout");
+  return error?.message ?? null;
 }
 
 export async function saveMember(formData: FormData) {

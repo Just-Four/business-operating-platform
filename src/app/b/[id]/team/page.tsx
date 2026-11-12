@@ -65,7 +65,7 @@ function RoleForm({ businessId, role, back }: { businessId: string; role?: Role;
       </div>
       <div>
         <label className="label" htmlFor={`${p}-standing_instructions`}>Standing instructions</label>
-        <p className="hint mb-2">How this role works, written so a new person or an AI agent could follow it on day one.</p>
+        <p className="hint mb-2">How this role works day to day, beyond the steps in its processes. Written so a new person or an AI agent could follow it on day one.</p>
         <textarea className="input min-h-28" id={`${p}-standing_instructions`} name="standing_instructions" defaultValue={role?.standing_instructions ?? ""} />
       </div>
       <div>
@@ -99,10 +99,12 @@ export default async function TeamPage({
   const { error, saved, session } = await searchParams;
   const back = session ? `/b/${id}/team?session=${session}` : undefined;
   const supabase = await createClient();
-  const [{ data: roles }, { data: measures }, { data: tasks }] = await Promise.all([
+  const [{ data: roles }, { data: measures }, { data: tasks }, { data: processes }, { data: steps }] = await Promise.all([
     supabase.from("roles").select("*").eq("business_id", id).eq("active", true).order("created_at"),
     supabase.from("measures").select("id, role_id").eq("business_id", id).eq("active", true),
     supabase.from("tasks").select("id, role_id, status").eq("business_id", id).in("status", ["queued", "in_progress", "blocked", "escalated", "awaiting_approval", "awaiting_review"]),
+    supabase.from("processes").select("id, name, owner_role_id").eq("business_id", id).order("created_at"),
+    supabase.from("process_steps").select("id, process_id, seq, title, role_id, route, minutes, review_required").eq("business_id", id).order("seq"),
   ]);
   const list = (roles ?? []) as Role[];
 
@@ -136,6 +138,9 @@ export default async function TeamPage({
         {list.map((r) => {
           const m = (measures ?? []).filter((x) => x.role_id === r.id).length;
           const t = (tasks ?? []).filter((x) => x.role_id === r.id).length;
+          const mySteps = (steps ?? []).filter((x) => x.role_id === r.id);
+          const myProcs = (processes ?? []).filter((pr) => pr.owner_role_id === r.id || mySteps.some((x) => x.process_id === pr.id));
+          const mins = mySteps.reduce((a, x) => a + (x.minutes ?? 0), 0);
           return (
             <details key={r.id} className="card group p-0">
               <summary className="flex cursor-pointer flex-wrap items-center gap-x-4 gap-y-2 p-4">
@@ -146,9 +151,49 @@ export default async function TeamPage({
                 <span className="tag" data-tone={r.filled_by ? "go" : "stop"}>{r.filled_by || "Vacant"}</span>
                 <span className="tag" data-tone="quiet">{ROUTES[r.route]?.label ?? r.route}</span>
                 <span className="tag" data-tone={m ? "go" : "wait"}>{m ? `${m} measure${m > 1 ? "s" : ""}` : "No scorecard"}</span>
+                <span className="tag" data-tone={mySteps.length ? "go" : "quiet"}>
+                  {mySteps.length ? `${mySteps.length} step${mySteps.length > 1 ? "s" : ""} in ${myProcs.length} process${myProcs.length > 1 ? "es" : ""}` : "No process steps"}
+                </span>
                 {t > 0 && <span className="tag" data-tone="quiet">{t} open task{t > 1 ? "s" : ""}</span>}
               </summary>
               <div className="border-t border-[var(--line)] p-4">
+                <section className="mb-6 rounded border border-[var(--line)] bg-[var(--paper)] p-4" aria-label="The work this role does">
+                  <h3 className="font-semibold">The work this role does</h3>
+                  {myProcs.length === 0 ? (
+                    <p className="mt-1 text-sm">
+                      No process step is this role&apos;s job yet. Open a process, press &ldquo;Change this process&rdquo; and pick this role under &ldquo;Whose job is it?&rdquo; on each step it does.{" "}
+                      <Link className="font-semibold underline underline-offset-4" href={`/b/${id}/processes`}>Go to processes</Link>
+                    </p>
+                  ) : (
+                    <>
+                      <p className="hint">
+                        Taken from the processes. To change a step, change it in its process.
+                        {mins > 0 ? ` About ${mins} minutes each time these run.` : ""}
+                      </p>
+                      <ul className="mt-3 space-y-3 text-sm">
+                        {myProcs.map((pr) => (
+                          <li key={pr.id}>
+                            <Link className="font-semibold underline underline-offset-4" href={`/b/${id}/processes/${pr.id}`}>{pr.name}</Link>
+                            {pr.owner_role_id === r.id && <span className="tag ml-2" data-tone="go">Owns this process</span>}
+                            <ul className="mt-1 space-y-0.5">
+                              {mySteps
+                                .filter((x) => x.process_id === pr.id)
+                                .map((x) => (
+                                  <li key={x.id}>
+                                    Step {x.seq}: {x.title}
+                                    <span className="text-[var(--muted)]">
+                                      {" "}
+                                      ({x.route === "person" ? "done by hand" : `done by ${ROUTES[x.route]?.label ?? x.route}${x.review_required ? ", this role checks the result" : ""}`})
+                                    </span>
+                                  </li>
+                                ))}
+                            </ul>
+                          </li>
+                        ))}
+                      </ul>
+                    </>
+                  )}
+                </section>
                 <RoleForm businessId={id} role={r} back={back} />
                 <p className="mt-4 flex gap-5 text-sm">
                   <Link className="underline underline-offset-4" href={`/b/${id}/scorecards`}>Scorecard</Link>

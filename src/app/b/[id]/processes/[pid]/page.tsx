@@ -427,7 +427,9 @@ export default async function ProcessPage({
                   {s.seq}. {s.title}
                 </span>
                 <span className="tag" data-tone="quiet">{ROUTES[s.route]?.label ?? s.route}</span>
-                {roleName(s.role_id) && <span className="tag" data-tone="quiet">{roleName(s.role_id)}</span>}
+                {roleName(s.role_id) && (
+                  <Link className="tag" data-tone="quiet" href={`/b/${id}/team`}>{roleName(s.role_id)}</Link>
+                )}
                 {s.review_required && <span className="tag" data-tone="wait">Checked by a person</span>}
               </div>
               {s.instructions && <p className="mt-2 whitespace-pre-line text-sm">{s.instructions}</p>}

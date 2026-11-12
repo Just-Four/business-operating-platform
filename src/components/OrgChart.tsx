@@ -15,8 +15,11 @@ export default function OrgChart({ businessId, roles, canEdit = true }: { busine
   const [busy, start] = useTransition();
   const ids = new Set(roles.map((r) => r.id));
   const parentOf = (r: ChartRole) => (r.reportsTo && ids.has(r.reportsTo) ? r.reportsTo : null);
-  const top = roles.filter((r) => !parentOf(r));
   const kids = (id: string) => roles.filter((r) => parentOf(r) === id);
+  const top = roles.filter((r) => !parentOf(r));
+  // Roles that are part of a hierarchy are drawn as the chart; the rest wait in a row underneath.
+  const trees = top.filter((r) => kids(r.id).length > 0);
+  const loose = top.filter((r) => kids(r.id).length === 0);
 
   // A role can't report to itself or to anything beneath it.
   const below = (id: string): string[] => kids(id).flatMap((k) => [k.id, ...below(k.id)]);
@@ -71,9 +74,9 @@ export default function OrgChart({ businessId, roles, canEdit = true }: { busine
             drop(r.id);
           }}
         >
-          {r.area && <span className="org-area">{r.area}</span>}
-          <span className="org-name">{r.name}</span>
-          <span className="org-who" data-empty={r.holders.length ? undefined : "true"}>
+          <span className="org-area">{r.area ?? "\u00a0"}</span>
+          <span className="org-name" title={r.name}>{r.name}</span>
+          <span className="org-who" title={r.holders.join(", ")} data-empty={r.holders.length ? undefined : "true"}>
             {r.holders.length ? r.holders.join(", ") : "Nobody yet"}
           </span>
         </div>
@@ -107,11 +110,17 @@ export default function OrgChart({ businessId, roles, canEdit = true }: { busine
         </div>
       )}
       {message && <p className="mt-2 rounded bg-red-50 p-3 text-sm text-red-800">{message}</p>}
-      <div className="org-scroll">
-        <ul className="org-tree">
-          {top.map((r) => node(r))}
-        </ul>
-      </div>
+      {trees.length > 0 && (
+        <div className="org-scroll">
+          <ul className="org-tree">{trees.map((r) => node(r))}</ul>
+        </div>
+      )}
+      {loose.length > 0 && (
+        <div className={trees.length ? "org-loose org-loose-below" : "org-loose"}>
+          {trees.length > 0 && <p className="org-loose-label">Not placed yet. Drag each one onto the role it reports to.</p>}
+          <ul className="org-row">{loose.map((r) => node(r))}</ul>
+        </div>
+      )}
     </div>
   );
 }

@@ -367,7 +367,8 @@ h3,
   padding-top: 0;
   width: max-content;
   min-width: 100%;
-  gap: 1.5rem;
+  margin: 0 auto;
+  gap: 2rem;
 }
 .org-tree li {
   position: relative;
@@ -420,21 +421,23 @@ h3,
   content: "";
   position: absolute;
   top: 0;
-  left: 50%;
+  left: calc(50% - 1px);
   height: 1.25rem;
   border-left: 2px solid var(--line);
 }
 .org-box {
   display: inline-flex;
   flex-direction: column;
-  gap: 0.15rem;
-  width: 11.5rem;
+  align-items: center;
+  width: 12rem;
+  height: 6.75rem;
   padding: 0.6rem 0.7rem;
   border: 1px solid var(--line);
   border-radius: 6px;
   background: var(--surface);
-  text-align: left;
+  text-align: center;
   cursor: grab;
+  overflow: hidden;
 }
 .org-box:active {
   cursor: grabbing;
@@ -448,21 +451,65 @@ h3,
   box-shadow: 0 0 0 2px var(--go);
 }
 .org-area {
+  flex: none;
+  height: 1rem;
   font-size: 11px;
+  line-height: 1rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--muted);
 }
 .org-name {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  min-height: 0;
   font-weight: 600;
   line-height: 1.25;
 }
+.org-name {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  flex: none;
+  max-height: 2.5rem;
+  margin: auto 0;
+}
 .org-who {
+  flex: none;
+  max-width: 100%;
   font-size: 13px;
+  line-height: 1.25rem;
   color: var(--go);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .org-who[data-empty="true"] {
   color: var(--stop);
+}
+.org-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 1rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.org-loose {
+  padding-top: 1rem;
+}
+.org-loose-below {
+  margin-top: 1rem;
+  border-top: 1px dashed var(--line);
+}
+.org-loose-label {
+  margin-bottom: 0.75rem;
+  font-size: 13px;
+  color: var(--muted);
+  text-align: center;
 }
 .org-top {
   border: 2px dashed var(--line);

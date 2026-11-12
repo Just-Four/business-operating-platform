@@ -372,8 +372,12 @@ h3,
 }
 .org-tree li {
   position: relative;
-  padding: 1.25rem 0.5rem 0;
+  padding: 1.25rem 0 0;
   text-align: center;
+}
+/* the space between boxes sits on the box, so a role with roles beneath it is never wider than its box plus that space */
+.org-tree .org-box {
+  margin: 0 0.5rem;
 }
 .org-tree > li {
   padding-top: 0;

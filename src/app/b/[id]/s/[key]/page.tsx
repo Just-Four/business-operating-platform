@@ -11,7 +11,7 @@ import { RESPONSES, type CheckpointReview } from "@/lib/ai";
 
 export const maxDuration = 60;
 
-const PART_LABEL: Record<string, string> = { launch: "launch plan", direction: "direction", year: "This year", quarter: "This quarter", team: "Roles and team" };
+const PART_LABEL: Record<string, string> = { launch: "launch plan", direction: "direction", year: "This year", quarter: "This quarter", team: "Roles" };
 import Notice from "@/components/Notice";
 import CanvasBoard from "@/components/CanvasBoard";
 

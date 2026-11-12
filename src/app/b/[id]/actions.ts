@@ -436,9 +436,36 @@ export async function saveLookback(formData: FormData) {
 
 // ---------- Run side: roles, scorecards, tasks, agent keys ----------
 
+// Keeps the short "who fills it" line on each role in step with the people assigned to it.
+async function syncFilledBy(supabase: SupabaseClient, businessId: string) {
+  const [{ data: roles }, { data: links }, { data: people }] = await Promise.all([
+    supabase.from("roles").select("id, filled_by").eq("business_id", businessId),
+    supabase.from("role_assignments").select("role_id, member_id").eq("business_id", businessId),
+    supabase.from("team_members").select("id, name, active").eq("business_id", businessId).order("created_at"),
+  ]);
+  for (const r of roles ?? []) {
+    const names = (people ?? [])
+      .filter((p) => p.active && (links ?? []).some((l) => l.role_id === r.id && l.member_id === p.id))
+      .map((p) => p.name);
+    const text = names.length ? names.join(", ") : null;
+    if (text !== r.filled_by) await supabase.from("roles").update({ filled_by: text }).eq("id", r.id);
+  }
+}
+
+async function setLinks(supabase: SupabaseClient, businessId: string, column: "role_id" | "member_id", id: string, others: string[]) {
+  const other = column === "role_id" ? "member_id" : "role_id";
+  const { data: existing } = await supabase.from("role_assignments").select("role_id, member_id").eq(column, id);
+  const have = (existing ?? []).map((x) => (x as Record<string, string>)[other]);
+  const drop = have.filter((x) => !others.includes(x));
+  const add = others.filter((x) => !have.includes(x));
+  if (drop.length) await supabase.from("role_assignments").delete().eq(column, id).in(other, drop);
+  if (add.length) await supabase.from("role_assignments").insert(add.map((x) => ({ business_id: businessId, [column]: id, [other]: x })));
+}
+
 export async function saveRole(formData: FormData) {
   const businessId = String(formData.get("business_id"));
-  const id = str(formData, "id");
+  const existingId = str(formData, "id");
+  const id = existingId ?? randomUUID();
   const supabase = await createClient();
   const gates = (str(formData, "approval_gates") ?? "")
     .split("\n")
@@ -447,8 +474,8 @@ export async function saveRole(formData: FormData) {
   const row = {
     business_id: businessId,
     name: str(formData, "name") ?? "Unnamed role",
+    department: str(formData, "department"),
     purpose: str(formData, "purpose"),
-    filled_by: str(formData, "filled_by"),
     route: str(formData, "route") ?? "person",
     fallback_route: str(formData, "fallback_route"),
     standing_instructions: str(formData, "standing_instructions"),
@@ -456,10 +483,47 @@ export async function saveRole(formData: FormData) {
     capacity_trigger: str(formData, "capacity_trigger"),
     approval_gates: gates,
   };
-  const { error } = id
-    ? await supabase.from("roles").update(row).eq("id", id)
-    : await supabase.from("roles").insert(row);
+  const { error } = existingId ? await supabase.from("roles").update(row).eq("id", id) : await supabase.from("roles").insert({ id, ...row });
+  if (!error) {
+    await setLinks(supabase, businessId, "role_id", id, formData.getAll("member_id").map(String));
+    await syncFilledBy(supabase, businessId);
+  }
   await done(formData, supabase, businessId, "team", error?.message);
+}
+
+export async function saveMember(formData: FormData) {
+  const businessId = String(formData.get("business_id"));
+  const existingId = str(formData, "id");
+  const id = existingId ?? randomUUID();
+  const supabase = await createClient();
+  const name = str(formData, "name");
+  if (!name) return done(formData, supabase, businessId, "people", "Give the person a name.");
+  const row = {
+    business_id: businessId,
+    name,
+    email: str(formData, "email"),
+    note: str(formData, "note"),
+    active: formData.get("left") !== "1",
+  };
+  const { error } = existingId ? await supabase.from("team_members").update(row).eq("id", id) : await supabase.from("team_members").insert({ id, ...row });
+  if (!error) {
+    await setLinks(supabase, businessId, "member_id", id, formData.getAll("role_id").map(String));
+    await syncFilledBy(supabase, businessId);
+  }
+  await done(formData, supabase, businessId, "people", error?.message);
+}
+
+// Several people at once: one name on each line.
+export async function pasteMembers(formData: FormData) {
+  const businessId = String(formData.get("business_id"));
+  const supabase = await createClient();
+  const names = (str(formData, "pasted") ?? "")
+    .split("\n")
+    .map((n) => n.trim())
+    .filter(Boolean);
+  if (!names.length) return done(formData, supabase, businessId, "people", "Type at least one name.");
+  const { error } = await supabase.from("team_members").insert(names.map((name) => ({ business_id: businessId, name })));
+  await done(formData, supabase, businessId, "people", error?.message);
 }
 
 export async function addMeasure(formData: FormData) {

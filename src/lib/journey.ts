@@ -219,7 +219,8 @@ export async function getJourney(
     : "No process written yet.";
   const buildRows: Row[] = [
     { title: "Processes", detail: buildSummary, href: `${base}/processes`, tag: procs.length ? (buildDone ? TAG.complete : TAG.partial) : TAG.empty },
-    { title: "Roles and team", detail: progress.detail.team ?? "Not started", href: `${base}/team`, tag: TAG[progress.states.team ?? "empty"] },
+    { title: "Roles", detail: progress.detail.team ?? "Not started", href: `${base}/team`, tag: TAG[progress.states.team ?? "empty"] },
+    { title: "Team", detail: "The people, and which roles each one holds", href: `${base}/people` },
   ];
 
   // Run

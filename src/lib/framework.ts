@@ -96,7 +96,7 @@ export const PARTS: Part[] = [
   {
     num: 8,
     slug: "team",
-    title: "Roles and team",
+    title: "Roles",
     summary: "Role cards with scorecard, instructions, route, fallback and approval gates.",
     built: true,
     stages: { launch: "on", early_revenue: "on", established: "on" },
@@ -207,3 +207,6 @@ export function ragOf(value: number | null | undefined, target: number | null | 
   if (target === 0) return "red";
   return value / target >= 0.9 ? "amber" : "red";
 }
+
+// Areas of the business a role can sit in. A business can type its own as well.
+export const DEPARTMENTS = ["Leadership", "Marketing", "Sales", "Operations", "Finance", "Legal", "People"];

@@ -71,7 +71,8 @@ export default function SideNav({
 
       <Head n={2} title="Build" />
       <Item href={`${base}/processes`} label="Processes" />
-      <Item href={`${base}/team`} label="Roles and team" />
+      <Item href={`${base}/team`} label="Roles" />
+      <Item href={`${base}/people`} label="Team" />
 
       <Head n={3} title="Run" />
       <Item href={`${base}/tasks`} label="Tasks" />

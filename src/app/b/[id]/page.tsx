@@ -7,6 +7,8 @@ import { getJourney, getNeeds } from "@/lib/journey";
 import { updateStage } from "./actions";
 import Notice from "@/components/Notice";
 import NeedsList from "@/components/NeedsList";
+import BusinessMap from "@/components/BusinessMap";
+import { getFunctions } from "@/lib/functions";
 
 const ORDER: Stage[] = ["launch", "early_revenue", "established"];
 const STATE_TAG = {
@@ -28,7 +30,7 @@ export default async function BusinessHome({
   const { data: biz } = await supabase.from("businesses").select("name, stage, model, sector, planning_route").eq("id", id).single();
   if (biz && !biz.planning_route) redirect(`/b/${id}/start`);
   const stage = (biz?.stage ?? "launch") as Stage;
-  const [progress, needs] = await Promise.all([getProgress(supabase, id), getNeeds(supabase, id)]);
+  const [progress, needs, functions] = await Promise.all([getProgress(supabase, id), getNeeds(supabase, id), getFunctions(supabase, id)]);
   const journey = await getJourney(supabase, id, { stage: biz?.stage ?? null, planning_route: biz?.planning_route ?? null }, progress, needs);
   const acting = needs.filter((n) => n.acts);
 
@@ -64,7 +66,10 @@ export default async function BusinessHome({
         </section>
       )}
 
-      <div className="mt-10 space-y-6">
+      <BusinessMap businessId={id} parts={functions.parts} />
+
+      <h2 className="display mt-10 text-2xl font-bold">The five stages</h2>
+      <div className="mt-3 space-y-6">
         {journey.stages.map((s) => (
           <section key={s.key} className="card p-0" aria-labelledby={`stage-${s.key}`}>
             <div className="flex flex-wrap items-start gap-x-4 gap-y-3 p-5">

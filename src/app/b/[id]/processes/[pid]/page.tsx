@@ -5,6 +5,7 @@ import Notice from "@/components/Notice";
 import PendingButton from "@/components/PendingButton";
 import StepStrip from "@/components/StepStrip";
 import { ROUTES } from "@/lib/framework";
+import { FUNCTION_NAMES } from "@/lib/functions";
 import { QUESTIONS, parseAssessment, stepState, suggestRoute } from "@/lib/process";
 import { moveStep, pasteSteps, removeStep, saveProcess, saveStep, startRun, stopRun } from "../../process-actions";
 
@@ -304,6 +305,15 @@ export default async function ProcessPage({
                 <label className="label" htmlFor="outcome">What must exist when the whole thing is done?</label>
                 <textarea className="input min-h-20" id="outcome" name="outcome" defaultValue={proc.outcome ?? ""} />
               </div>
+            </div>
+            <div>
+              <label className="label" htmlFor="function">Which part of the business is it in?</label>
+              <select className="input" id="function" name="function" defaultValue={proc.function ?? ""}>
+                <option value="">Not set</option>
+                {FUNCTION_NAMES.map((f) => (
+                  <option key={f} value={f}>{f}</option>
+                ))}
+              </select>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div>

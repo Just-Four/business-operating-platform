@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import Notice from "@/components/Notice";
+import { FUNCTION_NAMES } from "@/lib/functions";
 import { addProcess } from "../process-actions";
 
 export default async function ProcessesPage({
@@ -14,11 +15,13 @@ export default async function ProcessesPage({
   const { error, saved } = await searchParams;
   const supabase = await createClient();
   const [{ data: processes }, { data: steps }, { data: runs }] = await Promise.all([
-    supabase.from("processes").select("id, name, purpose, version, updated_at").eq("business_id", id).order("created_at"),
+    supabase.from("processes").select("id, name, purpose, version, updated_at, function").eq("business_id", id).order("created_at"),
     supabase.from("process_steps").select("process_id").eq("business_id", id),
     supabase.from("process_runs").select("process_id, status").eq("business_id", id),
   ]);
   const list = processes ?? [];
+  const inPart = (f: string | null) => (f && FUNCTION_NAMES.includes(f) ? f : "");
+  const groups = [...FUNCTION_NAMES.filter((f) => list.some((p) => p.function === f)), ...(list.some((p) => !inPart(p.function)) ? [""] : [])];
 
   return (
     <div className="max-w-4xl">
@@ -39,9 +42,12 @@ export default async function ProcessesPage({
         ))}
       </ol>
 
-      {list.length > 0 && (
-        <ul className="mt-8 space-y-3">
-          {list.map((p) => {
+      {groups.map((g) => (
+        <section key={g || "none"} className="mt-8">
+          <h2 className="display text-xl font-bold">{g || "No part of the business set yet"}</h2>
+          {!g && <p className="hint">Open a process, press Change this process, and pick its part under Name, purpose and owner.</p>}
+          <ul className="mt-3 space-y-3">
+          {list.filter((p) => inPart(p.function) === g).map((p) => {
             const n = (steps ?? []).filter((s) => s.process_id === p.id).length;
             const pRuns = (runs ?? []).filter((r) => r.process_id === p.id);
             const running = pRuns.filter((r) => r.status === "running").length;
@@ -67,8 +73,9 @@ export default async function ProcessesPage({
               </li>
             );
           })}
-        </ul>
-      )}
+          </ul>
+        </section>
+      ))}
 
       <section className="mt-10">
         <h2 className="display text-2xl font-bold">{list.length ? "Write another process" : "Write your first process"}</h2>
@@ -81,6 +88,15 @@ export default async function ProcessesPage({
           <div>
             <label className="label" htmlFor="name">What is it called?</label>
             <input className="input" id="name" name="name" required placeholder="Follow up a new enquiry" />
+          </div>
+          <div>
+            <label className="label" htmlFor="function">Which part of the business is it in?</label>
+            <select className="input" id="function" name="function" defaultValue="">
+              <option value="">Not sure yet</option>
+              {FUNCTION_NAMES.map((f) => (
+                <option key={f} value={f}>{f}</option>
+              ))}
+            </select>
           </div>
           <div>
             <label className="label" htmlFor="outcome">What must exist when it&apos;s done? (optional)</label>

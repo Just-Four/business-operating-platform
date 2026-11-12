@@ -3,7 +3,8 @@ import NextPart from "@/components/NextPart";
 import { createClient } from "@/lib/supabase/server";
 import { saveRole } from "../actions";
 import Notice from "@/components/Notice";
-import { ROUTES, DEFAULT_GATES, DEPARTMENTS } from "@/lib/framework";
+import { ROUTES, DEFAULT_GATES } from "@/lib/framework";
+import { FUNCTION_NAMES as DEPARTMENTS } from "@/lib/functions";
 import OrgChart from "@/components/OrgChart";
 
 type Role = {
@@ -65,14 +66,14 @@ function RoleForm({
           <input className="input" id={`${p}-name`} name="name" required defaultValue={role?.name ?? ""} placeholder="Sales lead" />
         </div>
         <div>
-          <label className="label" htmlFor={`${p}-department`}>Area of the business</label>
-          <p className="hint mb-2">Pick one or type your own.</p>
-          <input className="input" id={`${p}-department`} name="department" list={`${p}-areas`} defaultValue={role?.department ?? ""} placeholder="Sales" />
-          <datalist id={`${p}-areas`}>
+          <label className="label" htmlFor={`${p}-department`}>Part of the business</label>
+          <p className="hint mb-2">One of the seven parts every business has.</p>
+          <select className="input" id={`${p}-department`} name="department" defaultValue={role?.department ?? ""}>
+            <option value="">Not set</option>
             {areas.map((a) => (
-              <option key={a} value={a} />
+              <option key={a} value={a}>{a}</option>
             ))}
-          </datalist>
+          </select>
         </div>
       </div>
       <div>
@@ -185,7 +186,7 @@ export default async function RolesPage({
       <h1 className="text-4xl font-bold leading-none sm:text-5xl">Roles</h1>
       <p className="mt-3 max-w-2xl text-[var(--muted)]">
         A role is a set of work that has to be done, whoever does it. It is defined by the process steps that are its job,
-        and it sits in an area of the business. People are separate: one person can hold several roles, and a role can
+        and it sits in one of the seven parts of the business. People are separate: one person can hold several roles, and a role can
         change hands without changing the role.
       </p>
       <p className="mt-2 text-sm">
@@ -225,7 +226,7 @@ export default async function RolesPage({
       {groups.map((g) => (
         <section key={g || "none"} className="mt-5">
           <h3 className="display text-xl font-bold">{g || "No area set yet"}</h3>
-          {!g && <p className="hint">Open a role and pick its area, such as Sales, Operations or Finance.</p>}
+          {!g && <p className="hint">Open a role and pick its part of the business, such as Sales and marketing, Operations or Finance.</p>}
           <div className="mt-3 space-y-3">
             {list
               .filter((r) => (r.department ?? "") === g)

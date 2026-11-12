@@ -10,6 +10,7 @@ import { CLAUDE_STALE_MINUTES, parseAssessment } from "@/lib/process";
 import { CLAUDE_LABEL, finishClaudeTask } from "@/lib/agent";
 import { afterStepPath } from "@/lib/next-step";
 import { MOMENTS } from "@/lib/story";
+import { FUNCTION_NAMES, MOMENT_FUNCTION } from "@/lib/functions";
 
 const ROUTE_KEYS = ["person", "grok_bot", "claude", "n8n", "cheap_model"];
 
@@ -17,6 +18,11 @@ function str(formData: FormData, key: string) {
   const v = formData.get(key);
   const s = v === null ? "" : String(v).trim();
   return s.length ? s : null;
+}
+
+function fnName(formData: FormData) {
+  const s = str(formData, "function");
+  return s && FUNCTION_NAMES.includes(s) ? s : null;
 }
 
 function route(formData: FormData, key: string) {
@@ -51,7 +57,7 @@ async function snapshot(supabase: SupabaseClient, processId: string, bump: boole
     changed_by: user?.id ?? null,
     changed_by_email: user?.email ?? null,
     snapshot: {
-      process: { name: p.name, purpose: p.purpose, trigger_text: p.trigger_text, outcome: p.outcome, owner_role_id: p.owner_role_id },
+      process: { name: p.name, purpose: p.purpose, trigger_text: p.trigger_text, outcome: p.outcome, owner_role_id: p.owner_role_id, function: p.function },
       steps: (steps ?? []).map((s) => ({
         seq: s.seq,
         title: s.title,
@@ -108,12 +114,38 @@ export async function storyToProcess(formData: FormData) {
   if (!name) back(formData, businessId, "story", "Give the process a name.");
   const { data: point } = await supabase.from("story_points").select("what_happens").eq("business_id", businessId).eq("moment", moment).maybeSingle();
   const id = randomUUID();
-  const { error } = await supabase.from("processes").insert({ id, business_id: businessId, name, purpose: point?.what_happens ?? null, created_by: user?.id ?? null });
+  const { error } = await supabase
+    .from("processes")
+    .insert({ id, business_id: businessId, name, purpose: point?.what_happens ?? null, function: MOMENT_FUNCTION[moment] ?? null, created_by: user?.id ?? null });
   if (error) back(formData, businessId, "story", error.message);
   await snapshot(supabase, id, false, "Created from how the business works");
   await supabase.from("story_points").update({ process_id: id }).eq("business_id", businessId).eq("moment", moment);
   revalidatePath(`/b/${businessId}`, "layout");
   redirect(`/b/${businessId}/processes/${id}`);
+}
+
+// ---------- The seven parts of the business ----------
+
+export async function saveFunctionOwners(formData: FormData) {
+  const businessId = String(formData.get("business_id"));
+  const fn = fnName(formData);
+  if (!fn) back(formData, businessId, "", "Pick a part of the business.");
+  const supabase = await createClient();
+  const chosen = formData.getAll("member_id").map(String).filter(Boolean);
+  const { data: existing } = await supabase.from("function_owners").select("member_id").eq("business_id", businessId).eq("function", fn);
+  const had = (existing ?? []).map((r) => r.member_id as string);
+  const add = chosen.filter((m) => !had.includes(m));
+  const drop = had.filter((m) => !chosen.includes(m));
+  let error: string | undefined;
+  if (add.length) {
+    const res = await supabase.from("function_owners").insert(add.map((m) => ({ business_id: businessId, function: fn, member_id: m })));
+    error = res.error?.message;
+  }
+  if (!error && drop.length) {
+    const res = await supabase.from("function_owners").delete().eq("business_id", businessId).eq("function", fn).in("member_id", drop);
+    error = res.error?.message;
+  }
+  back(formData, businessId, "", error);
 }
 
 // ---------- Procedures ----------
@@ -133,6 +165,7 @@ export async function addProcess(formData: FormData) {
     name,
     purpose: str(formData, "purpose"),
     outcome: str(formData, "outcome"),
+    function: fnName(formData),
     created_by: user?.id ?? null,
   });
   if (error) back(formData, businessId, "processes", error.message);
@@ -155,6 +188,7 @@ export async function saveProcess(formData: FormData) {
       trigger_text: str(formData, "trigger_text"),
       outcome: str(formData, "outcome"),
       owner_role_id: str(formData, "owner_role_id"),
+      function: fnName(formData),
     })
     .eq("id", processId);
   if (!error) await snapshot(supabase, processId, true, str(formData, "reason"));

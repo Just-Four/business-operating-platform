@@ -109,7 +109,7 @@ export default async function QuarterPage({
           <Link href={`/b/${id}/s/${session}`} className="font-semibold underline underline-offset-4">Back to the session</Link>
         </p>
       )}
-      <p className="hint">Part 6</p>
+      <p className="hint">Stage 1: Plan, part 6 of 6</p>
       <h1 className="text-4xl font-bold leading-none sm:text-5xl">This quarter</h1>
       <p className="mt-3 max-w-2xl text-[var(--muted)]">
         A year is too long to steer by. Pick the three to five things that must get done in the next three months, give

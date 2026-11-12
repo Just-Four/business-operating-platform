@@ -72,9 +72,10 @@ export default async function StartPage({
       <Notice error={error} />
       <h1 className="text-4xl font-bold leading-none sm:text-5xl">Let&apos;s set up {biz?.name ?? "your plan"}</h1>
       <p className="mt-3 text-[var(--muted)]">
-        Five quick questions. Your answers decide how the planning works for you: a guided programme over a couple of
-        weeks, a shorter set of sessions, or straight to the full plan. You can change your mind later.
+        The first stage is the plan. Five quick questions decide how you write it: short guided sessions over a couple
+        of weeks, fewer and longer sessions, or straight to the full plan. You can change your mind later.
       </p>
+      <p className="hint mt-2">After the plan come Build, Run and Review. You don&apos;t need to think about those yet.</p>
 
       <form action={startProgramme} className="mt-8 space-y-8">
         <input type="hidden" name="business_id" value={id} />

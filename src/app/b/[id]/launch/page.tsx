@@ -48,7 +48,7 @@ export default async function LaunchPage({
           <Link href={`/b/${id}/s/${session}`} className="font-semibold underline underline-offset-4">Back to the session</Link>
         </p>
       )}
-      <p className="hint">Part 4</p>
+      <p className="hint">Stage 1: Plan, part 4 of 6</p>
       <h1 className="text-4xl font-bold leading-none sm:text-5xl">Launch plan</h1>
       <p className="mt-3 text-[var(--muted)] max-w-3xl">
         A new business plans against assumptions, not history. Test the riskiest first, and release more money only

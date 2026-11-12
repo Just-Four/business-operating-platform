@@ -94,7 +94,7 @@ export default async function ReviewsPage({
   return (
     <div className="max-w-4xl">
       <Notice error={error} saved={saved} />
-      <p className="hint">Part 10</p>
+      <p className="hint">Stage 4: Review</p>
       <h1 className="text-4xl font-bold leading-none sm:text-5xl">Monthly review</h1>
       <p className="mt-3 max-w-2xl text-[var(--muted)]">
         Once a month, stop and look at the whole business on one page. What moved, what slipped, what you learned, and

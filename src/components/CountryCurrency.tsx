@@ -11,7 +11,7 @@ export default function CountryCurrency({ defaultCountry = "United Kingdom" }: {
   return (
     <>
       <div>
-        <label className="label" htmlFor="country">Country</label>
+        <label className="label" htmlFor="country">Which country is it in?</label>
         <select
           className="input"
           id="country"
@@ -31,7 +31,7 @@ export default function CountryCurrency({ defaultCountry = "United Kingdom" }: {
         </select>
       </div>
       <div>
-        <label className="label" htmlFor="currency">Currency</label>
+        <label className="label" htmlFor="currency">Currency (set from the country)</label>
         <select className="input" id="currency" name="currency" value={currency} onChange={(e) => setCurrency(e.target.value)}>
           {currencies.map((c) => (
             <option key={c} value={c}>

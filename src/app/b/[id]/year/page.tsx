@@ -176,7 +176,7 @@ export default async function YearPage({
           <Link href={`/b/${id}/s/${session}`} className="font-semibold underline underline-offset-4">Back to the session</Link>
         </p>
       )}
-      <p className="hint">Part 5</p>
+      <p className="hint">Stage 1: Plan, part 5 of 6</p>
       <h1 className="text-4xl font-bold leading-none sm:text-5xl">This year</h1>
       <p className="mt-3 max-w-2xl text-[var(--muted)]">
         The year in four decisions: the few battles you must win, where the money will come from, what the numbers look

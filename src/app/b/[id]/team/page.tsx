@@ -115,7 +115,7 @@ export default async function TeamPage({
           <Link href={`/b/${id}/s/${session}`} className="font-semibold underline underline-offset-4">Back to the session</Link>
         </p>
       )}
-      <p className="hint">Part 8</p>
+      <p className="hint">Stage 2: Build</p>
       <h1 className="text-4xl font-bold leading-none sm:text-5xl">Roles and team</h1>
       <p className="mt-3 max-w-2xl text-[var(--muted)]">
         Every goal needs an owner. A role can be filled by a person, an AI agent or an automation. Write each one so that

@@ -1,27 +1,21 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { SESSIONS, sessionTitle } from "@/lib/programme";
 import { createClient } from "@/lib/supabase/server";
-import { MODELS, PARTS, STAGES, STATE_LABELS, type Stage } from "@/lib/framework";
+import { MODELS, STAGES, type Stage } from "@/lib/framework";
 import { getProgress } from "@/lib/progress";
+import { getJourney, getNeeds } from "@/lib/journey";
 import { updateStage } from "./actions";
 import Notice from "@/components/Notice";
+import NeedsList from "@/components/NeedsList";
 
 const ORDER: Stage[] = ["launch", "early_revenue", "established"];
-
-const GROUPS = [
-  { title: "Plan", text: "What the business is, where it's going, and this year's and this quarter's targets.", parts: [1, 2, 3, 4, 5, 6] },
-  { title: "Run", text: "Who does the work, how it's measured, and how it's routed.", parts: [7, 8] },
-  { title: "Review", text: "The rhythm that checks the plan, and the monthly review.", parts: [9, 10] },
-];
-
-const STATE_TAG: Record<string, { tone: string; text: string }> = {
-  complete: { tone: "go", text: "Complete" },
-  partial: { tone: "wait", text: "Started" },
-  empty: { tone: "quiet", text: "Not started" },
+const STATE_TAG = {
+  done: { tone: "go", text: "Done" },
+  now: { tone: "wait", text: "In progress" },
+  ahead: { tone: "quiet", text: "Not started" },
 };
 
-export default async function BusinessOverview({
+export default async function BusinessHome({
   params,
   searchParams,
 }: {
@@ -34,135 +28,141 @@ export default async function BusinessOverview({
   const { data: biz } = await supabase.from("businesses").select("name, stage, model, sector, planning_route").eq("id", id).single();
   if (biz && !biz.planning_route) redirect(`/b/${id}/start`);
   const stage = (biz?.stage ?? "launch") as Stage;
-  const guided = ["guided", "focused", "partial"].includes(biz?.planning_route ?? "");
-  const { data: sessions } = guided
-    ? await supabase.from("programme_sessions").select("key, completed_at, scheduled_on").eq("business_id", id)
-    : { data: [] as { key: string; completed_at: string | null; scheduled_on: string | null }[] };
-  const todayIso = new Date().toISOString().slice(0, 10);
-  const progKeys = new Set((sessions ?? []).map((r) => r.key));
-  const progSessions = SESSIONS.filter((s) => progKeys.size === 0 || progKeys.has(s.key));
-  const nextS = guided ? progSessions.find((s) => !(sessions ?? []).find((r) => r.key === s.key)?.completed_at) : undefined;
-  const behindCount = (sessions ?? []).filter((r) => !r.completed_at && r.scheduled_on && r.scheduled_on < todayIso && SESSIONS.find((s) => s.key === r.key)?.built).length;
-  const progress = await getProgress(supabase, id);
-  const stageIndex = ORDER.indexOf(stage);
-
-  const builtOn = PARTS.filter((p) => p.built && p.stages[stage] !== "off");
-  const done = builtOn.filter((p) => progress.states[p.slug] === "complete").length;
-  const next = builtOn.find((p) => progress.states[p.slug] !== "complete");
+  const [progress, needs] = await Promise.all([getProgress(supabase, id), getNeeds(supabase, id)]);
+  const journey = await getJourney(supabase, id, { stage: biz?.stage ?? null, planning_route: biz?.planning_route ?? null }, progress, needs);
+  const acting = needs.filter((n) => n.acts);
 
   return (
-    <div>
+    <div className="max-w-5xl">
       <Notice error={error} saved={saved} />
+      <h1 className="text-4xl font-bold leading-none sm:text-5xl">{biz?.name}</h1>
+      <p className="mt-3 max-w-2xl text-[var(--muted)]">
+        Four stages, in order: plan the business, build the work that repeats, run it, review it. This page always shows the next thing to do.
+      </p>
 
-      {guided && nextS && (
-        <Link href={`/b/${id}/s/${nextS.key}`} className="card mb-8 flex items-center justify-between gap-4 border-[var(--ink)] p-5 hover:bg-[#f7f8fa]">
-          <span>
-            <span className="hint block">
-              Planning programme, session {progSessions.indexOf(nextS) + 1} of {progSessions.length}
-              {behindCount ? `, ${behindCount} behind schedule` : ""}
-            </span>
-            <span className="display text-2xl font-bold">{sessionTitle(nextS.key, biz?.stage)}</span>
-          </span>
-          <span className="btn">Continue</span>
-        </Link>
-      )}
-      <section aria-labelledby="stage-heading">
-        <h1 id="stage-heading" className="text-4xl font-bold leading-none sm:text-5xl">
-          {guided ? "Where the plan stands" : next ? `Next: ${next.title.toLowerCase()}` : "Plan foundations complete"}
-        </h1>
-        <p className="mt-3 max-w-2xl text-[var(--muted)]">
-          {done} of {builtOn.length} available parts complete for a business at this stage.
-          {next && !guided ? ` ${next.summary}` : ""}
-        </p>
-
-        <div className="mt-6 track" role="list" aria-label="Business stage">
-          {ORDER.map((s, i) => (
-            <div
-              key={s}
-              role="listitem"
-              className="track-step"
-              data-state={i < stageIndex ? "done" : i === stageIndex ? "current" : "ahead"}
-              aria-current={i === stageIndex ? "step" : undefined}
-            >
-              <span className="display block font-semibold">{STAGES[s]}</span>
-            </div>
-          ))}
+      <section className="card mt-6 border-2 border-[var(--ink)] p-6" aria-labelledby="next-heading">
+        <p className="hint" id="next-heading">Next thing to do. {journey.next.stage}</p>
+        <div className="mt-1 flex flex-wrap items-center gap-4">
+          <div className="min-w-0 flex-1">
+            <p className="display text-3xl font-bold leading-tight">{journey.next.title}</p>
+            <p className="mt-1 text-[var(--muted)]">{journey.next.why}</p>
+          </div>
+          <Link className="btn px-6 py-3 text-base" href={journey.next.href}>
+            {journey.next.label}
+          </Link>
         </div>
-
-        <form action={updateStage} className="mt-3 flex flex-wrap items-center gap-2">
-          <input type="hidden" name="business_id" value={id} />
-          <label htmlFor="sector" className="hint">
-            Sector
-          </label>
-          <input className="input w-48 py-1.5" id="sector" name="sector" defaultValue={biz?.sector ?? ""} />
-          <label htmlFor="model" className="hint ml-2">
-            How it makes money
-          </label>
-          <select className="input w-auto py-1.5" id="model" name="model" defaultValue={biz?.model ?? "other"}>
-            {Object.entries(MODELS).map(([k, v]) => (
-              <option key={k} value={k}>
-                {v}
-              </option>
-            ))}
-          </select>
-          <label htmlFor="stage" className="hint ml-2">
-            Stage
-          </label>
-          <select className="input w-auto py-1.5" id="stage" name="stage" defaultValue={stage}>
-            {ORDER.map((s) => (
-              <option key={s} value={s}>
-                {STAGES[s]}
-              </option>
-            ))}
-          </select>
-          <button className="btn btn-secondary py-1.5">Update</button>
-        </form>
       </section>
 
-      {GROUPS.map((g) => (
-        <section key={g.title} className="mt-12" aria-labelledby={`g-${g.title}`}>
-          <div className="flex items-baseline justify-between gap-4 border-b border-[var(--line)] pb-2">
-            <h2 id={`g-${g.title}`} className="text-2xl font-bold">
-              {g.title}
-            </h2>
-            <p className="hint hidden sm:block">{g.text}</p>
+      {acting.length > 1 && (
+        <section className="mt-8" aria-labelledby="needs-heading">
+          <h2 id="needs-heading" className="display text-2xl font-bold">
+            What needs you now <span className="text-[var(--muted)]">{acting.length}</span>
+          </h2>
+          <div className="mt-3">
+            <NeedsList needs={acting} limit={5} />
           </div>
-          <ul className="mt-2 divide-y divide-[var(--line)]">
-            {g.parts.map((num) => {
-              const p = PARTS.find((x) => x.num === num)!;
-              const s = p.stages[stage];
-              const prog = progress.states[p.slug];
-              const tag = !p.built
-                ? { tone: "quiet", text: "Not available yet" }
-                : s === "off"
-                  ? { tone: "quiet", text: "Not used at this stage" }
-                  : STATE_TAG[prog ?? "empty"];
-              return (
-                <li key={p.slug}>
-                  <Link
-                    href={`/b/${id}/${p.slug}`}
-                    className={`group grid grid-cols-[2.5rem_1fr_auto] items-center gap-4 py-4 ${s === "off" ? "opacity-55" : ""}`}
-                  >
-                    <span className="display text-2xl font-bold text-[var(--muted)]">{p.num}</span>
-                    <span className="min-w-0">
-                      <span className="block font-semibold group-hover:underline group-hover:underline-offset-4">
-                        {p.title}
-                        {s !== "on" && s !== "off" && (
-                          <span className="ml-2 font-normal text-[var(--muted)]">({STATE_LABELS[s].toLowerCase()})</span>
-                        )}
-                      </span>
-                      <span className="hint block">{p.built ? progress.detail[p.slug] : p.summary}</span>
-                    </span>
-                    <span className="tag" data-tone={tag.tone}>
-                      {tag.text}
-                    </span>
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
         </section>
-      ))}
+      )}
+
+      <div className="mt-10 space-y-6">
+        {journey.stages.map((s) => (
+          <section key={s.key} className="card p-0" aria-labelledby={`stage-${s.key}`}>
+            <div className="flex flex-wrap items-start gap-x-4 gap-y-3 p-5">
+              <span className="display flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[var(--ink)] text-xl font-bold text-white" aria-hidden="true">
+                {s.num}
+              </span>
+              <div className="min-w-0 flex-1">
+                <h2 id={`stage-${s.key}`} className="text-2xl font-bold leading-tight">
+                  {s.title}
+                  <span className="tag ml-3 align-middle" data-tone={STATE_TAG[s.state].tone}>
+                    {STATE_TAG[s.state].text}
+                  </span>
+                </h2>
+                <p className="mt-1 max-w-2xl text-sm">{s.purpose}</p>
+                <p className="hint max-w-2xl">{s.ends}</p>
+                <p className="mt-2 text-sm font-semibold">{s.summary}</p>
+              </div>
+              {s.action && (
+                <Link className="btn btn-secondary" href={s.action.href}>
+                  {s.action.label}
+                </Link>
+              )}
+            </div>
+            {s.key === "plan" && journey.guided ? (
+              <details className="border-t border-[var(--line)]">
+                <summary className="cursor-pointer px-5 py-3 text-sm text-[var(--muted)]">See the plan so far, part by part</summary>
+                <Rows rows={s.rows} />
+                <p className="border-t border-[var(--line)] px-5 py-3 text-sm">
+                  <Link className="underline underline-offset-4" href={`/b/${id}/programme`}>All planning sessions and their dates</Link>
+                </p>
+              </details>
+            ) : (
+              <div className="border-t border-[var(--line)]">
+                <Rows rows={s.rows} />
+                {s.key === "plan" && !journey.locked && (
+                  <p className="border-t border-[var(--line)] px-5 py-3 text-sm">
+                    When the parts are written:{" "}
+                    <Link className="font-semibold underline underline-offset-4" href={`/b/${id}/s/sign_off`}>have the plan reviewed</Link>, then{" "}
+                    <Link className="font-semibold underline underline-offset-4" href={`/b/${id}/year#lock`}>lock it</Link>.
+                  </p>
+                )}
+              </div>
+            )}
+          </section>
+        ))}
+      </div>
+
+      <details className="mt-10 text-sm">
+        <summary className="cursor-pointer text-[var(--muted)]">
+          Business details: {[biz?.sector || MODELS[biz?.model ?? "other"], STAGES[stage]].filter(Boolean).join(", ")}
+        </summary>
+        <form action={updateStage} className="mt-3 flex flex-wrap items-end gap-3">
+          <input type="hidden" name="business_id" value={id} />
+          <div>
+            <label htmlFor="sector" className="label">What it does</label>
+            <input className="input w-56" id="sector" name="sector" defaultValue={biz?.sector ?? ""} />
+          </div>
+          <div>
+            <label htmlFor="model" className="label">How customers pay</label>
+            <select className="input w-auto" id="model" name="model" defaultValue={biz?.model ?? "other"}>
+              {Object.entries(MODELS).map(([k, v]) => (
+                <option key={k} value={k}>{v}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label htmlFor="stage" className="label">How far along it is</label>
+            <select className="input w-auto" id="stage" name="stage" defaultValue={stage}>
+              {ORDER.map((s) => (
+                <option key={s} value={s}>{STAGES[s]}</option>
+              ))}
+            </select>
+          </div>
+          <button className="btn btn-secondary">Update</button>
+        </form>
+      </details>
     </div>
+  );
+}
+
+function Rows({ rows }: { rows: { title: string; detail: string; href: string; tag?: { tone: string; text: string } }[] }) {
+  return (
+    <ul className="divide-y divide-[var(--line)]">
+      {rows.map((r) => (
+        <li key={r.href}>
+          <Link href={r.href} className="group flex flex-wrap items-center gap-x-4 gap-y-1 px-5 py-3 hover:bg-[#f7f8fa]">
+            <span className="min-w-0 flex-1">
+              <span className="block font-semibold group-hover:underline group-hover:underline-offset-4">{r.title}</span>
+              <span className="hint block">{r.detail}</span>
+            </span>
+            {r.tag && (
+              <span className="tag" data-tone={r.tag.tone}>
+                {r.tag.text}
+              </span>
+            )}
+          </Link>
+        </li>
+      ))}
+    </ul>
   );
 }

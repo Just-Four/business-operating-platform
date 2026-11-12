@@ -8,6 +8,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { CLAUDE_STALE_MINUTES, parseAssessment } from "@/lib/process";
 import { CLAUDE_LABEL, finishClaudeTask } from "@/lib/agent";
+import { afterStepPath } from "@/lib/next-step";
 
 const ROUTE_KEYS = ["person", "grok_bot", "claude", "n8n", "cheap_model"];
 
@@ -236,7 +237,9 @@ export async function startRun(formData: FormData) {
   });
   if (error) back(formData, businessId, `processes/${processId}`, error.message);
   revalidatePath(`/b/${businessId}`, "layout");
-  redirect(`/b/${businessId}/tasks?run=${data}`);
+  // Land on the first step's task, with its one action showing.
+  const { data: first } = await supabase.from("tasks").select("id").eq("process_run_id", data).order("created_at").limit(1);
+  redirect(first?.[0] ? `/b/${businessId}/tasks?task=${first[0].id}&started=1` : `/b/${businessId}/tasks?run=${data}`);
 }
 
 export async function stopRun(formData: FormData) {
@@ -309,7 +312,14 @@ export async function approveResult(formData: FormData) {
     .from("tasks")
     .update({ status: "done", reviewed_at: new Date().toISOString(), reviewed_by: user?.id ?? null })
     .eq("id", taskId);
-  if (!error) await supabase.from("task_events").insert({ business_id: businessId, task_id: taskId, event: "result approved", actor: user?.email ?? "user", detail: str(formData, "note") });
+  if (!error) {
+    await supabase.from("task_events").insert({ business_id: businessId, task_id: taskId, event: "result approved", actor: user?.email ?? "user", detail: str(formData, "note") });
+    const nextPath = await afterStepPath(supabase, businessId, taskId);
+    if (nextPath) {
+      revalidatePath(`/b/${businessId}`, "layout");
+      redirect(nextPath);
+    }
+  }
   back(formData, businessId, "tasks", error?.message);
 }
 

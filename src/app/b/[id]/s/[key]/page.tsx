@@ -106,7 +106,7 @@ export default async function SessionPage({
           {row?.completed_at ? ", done" : ""}
         </p>
       )}
-      <h1 className="text-4xl font-bold leading-tight sm:text-5xl">{standalone && key === "sign_off" ? "Get the plan challenged" : session.title}</h1>
+      <h1 className="text-4xl font-bold leading-tight sm:text-5xl">{standalone && key === "sign_off" ? "Have the plan reviewed" : session.title}</h1>
       {isCheckpoint && !row?.approved_at && (
         <p className="mt-4">
           <a href="#review-options" className="btn">Go straight to the review</a>
@@ -317,7 +317,7 @@ export default async function SessionPage({
             ) : null}
             {row?.approved_at ? null : (
               <div className="space-y-4">
-                <h2 id="review-options" className="scroll-mt-6 text-2xl font-bold">How do you want it challenged?</h2>
+                <h2 id="review-options" className="scroll-mt-6 text-2xl font-bold">Who should review it?</h2>
                 <form action={recordReview} className="card space-y-4 p-5">
                   <input type="hidden" name="business_id" value={id} />
                   <input type="hidden" name="session_key" value={key} />

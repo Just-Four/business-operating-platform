@@ -8,6 +8,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { CANVAS_BOXES } from "@/lib/framework";
 import { guidanceFor } from "@/lib/guidance";
+import { afterStepPath } from "@/lib/next-step";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { SESSIONS, defaultDeadline, iso, keysForRoute, scheduleForRoute, type Route } from "@/lib/programme";
 
@@ -564,6 +565,13 @@ export async function updateTask(formData: FormData) {
       actor,
       detail: str(formData, "result"),
     });
+  }
+  if (!error && action === "done") {
+    const nextPath = await afterStepPath(supabase, businessId, taskId);
+    if (nextPath) {
+      revalidatePath(`/b/${businessId}`, "layout");
+      redirect(nextPath);
+    }
   }
   await done(formData, supabase, businessId, "tasks", error?.message);
 }

@@ -8,7 +8,7 @@ export default async function NextPart({ businessId, slug }: { businessId: strin
   const supabase = await createClient();
   const { data } = await supabase.from("businesses").select("stage, planning_route").eq("id", businessId).single();
   if (!data || data.planning_route !== "board") return null;
-  const usable = PARTS.filter((p) => p.built && p.stages[data.stage as Stage] !== "off");
+  const usable = PARTS.filter((p) => p.num <= 6 && p.built && p.stages[data.stage as Stage] !== "off");
   const i = usable.findIndex((p) => p.slug === slug);
   if (i < 0) return null;
   const prev = usable[i - 1];
@@ -28,7 +28,7 @@ export default async function NextPart({ businessId, slug }: { businessId: strin
         </Link>
       ) : (
         <Link href={`/b/${businessId}/s/sign_off`} className="font-semibold hover:underline">
-          Next: Get the plan challenged
+          Next: Have the plan reviewed
         </Link>
       )}
     </nav>

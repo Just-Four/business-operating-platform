@@ -73,7 +73,7 @@ export const SESSIONS: Session[] = [
   {
     key: "checkpoint_1",
     seq: 6,
-    title: "Get it challenged",
+    title: "Have it reviewed",
     minutes: 45,
     why: "A second pair of eyes catches what you can't see from inside the business. The point is to be challenged, not approved: is this really who pays, and is that really the biggest obstacle? Run it past someone you trust, or have the AI review it.",
     skipCost: "Errors in the business model or diagnosis flow into every target that follows.",

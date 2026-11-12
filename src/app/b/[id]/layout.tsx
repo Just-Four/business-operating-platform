@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { MODELS, PARTS, STAGES, STATE_LABELS, type Stage } from "@/lib/framework";
+import { MODELS, STAGES, STATE_LABELS, type Stage } from "@/lib/framework";
 import { getProgress } from "@/lib/progress";
 import { SESSIONS, sessionTitle } from "@/lib/programme";
-import SideRoute, { type RouteStop } from "@/components/SideRoute";
+import { type RouteStop } from "@/components/SideRoute";
+import SideNav from "@/components/SideNav";
+import { getNeeds, planParts } from "@/lib/journey";
 import { signOut } from "@/app/login/actions";
 
 export default async function BusinessLayout({
@@ -45,16 +47,21 @@ export default async function BusinessLayout({
     };
   });
 
-  const stops: RouteStop[] = PARTS.map((p) => {
+  const stops: RouteStop[] = planParts(stage).map((p) => {
     const s = p.stages[stage];
     return {
       num: p.num,
       slug: p.slug,
       title: p.title,
-      state: s === "off" ? "off" : (progress.states[p.slug] ?? "empty"),
-      note: s === "on" ? (p.built ? undefined : "Not available yet") : STATE_LABELS[s],
+      state: progress.states[p.slug] ?? "empty",
+      note: s === "on" ? undefined : STATE_LABELS[s],
     };
   });
+  const needs = await getNeeds(supabase, id);
+  const waiting = needs.filter((n) => n.acts).length;
+  const sessionsDone = sessionStops.filter((s) => s.state === "complete").length;
+  const partsDone = stops.filter((s) => s.state === "complete").length;
+  const planNote = guided ? `${sessionsDone} of ${sessionStops.length} sessions done` : `${partsDone} of ${stops.length} parts complete`;
 
   return (
     <div className="min-h-screen lg:flex">
@@ -72,41 +79,7 @@ export default async function BusinessLayout({
               {STAGES[stage]}
             </span>
           </Link>
-          {guided && (
-            <Link href={`/b/${id}/programme`} className="mt-6 block rounded border border-white/25 px-3 py-2 text-sm hover:bg-white/10">
-              Planning programme and dates
-            </Link>
-          )}
-          <nav className="mt-6 flex-1" aria-label={guided ? "Programme sessions" : "Plan parts"}>
-            <SideRoute businessId={id} stops={guided ? sessionStops : stops} />
-            {!guided && (
-              <div className="mt-6 space-y-2 text-sm">
-                <Link href={`/b/${id}/s/sign_off`} className="block rounded border border-[var(--wait)] px-3 py-2 font-semibold hover:bg-white/10">
-                  Get the plan challenged
-                  <span className="block font-normal text-white/70">AI review, or record someone else&apos;s</span>
-                </Link>
-                <Link href={`/b/${id}/year#lock`} className="block rounded border border-white/25 px-3 py-2 hover:bg-white/10">
-                  Lock the plan
-                </Link>
-              </div>
-            )}
-            {guided && (
-              <details className="mt-6 text-sm text-white/80">
-                <summary className="cursor-pointer hover:text-white">View the plan by part</summary>
-                <div className="mt-3">
-                  <SideRoute businessId={id} stops={stops} />
-                </div>
-              </details>
-            )}
-          </nav>
-          <nav className="mt-8 border-t border-white/15 pt-4 text-sm" aria-label="Run the business">
-            <p className="mb-2 text-white/60">Run the business</p>
-            <Link href={`/b/${id}/dashboard`} className="block rounded px-2 py-1.5 hover:bg-white/10">Dashboard</Link>
-            <Link href={`/b/${id}/processes`} className="block rounded px-2 py-1.5 hover:bg-white/10">Processes</Link>
-            <Link href={`/b/${id}/team`} className="block rounded px-2 py-1.5 hover:bg-white/10">Roles and team</Link>
-            <Link href={`/b/${id}/scorecards`} className="block rounded px-2 py-1.5 hover:bg-white/10">Scorecards</Link>
-            <Link href={`/b/${id}/tasks`} className="block rounded px-2 py-1.5 hover:bg-white/10">Tasks</Link>
-          </nav>
+          <SideNav businessId={id} guided={guided} planStops={guided ? sessionStops : stops} planNote={planNote} waiting={waiting} />
           <div className="mt-8 border-t border-white/15 pt-4 text-sm">
             <p className="truncate text-white/60">{user?.email}</p>
             <form action={signOut}>

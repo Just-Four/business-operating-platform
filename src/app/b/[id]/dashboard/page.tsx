@@ -3,6 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import StepStrip from "@/components/StepStrip";
 import AutoRefresh from "@/components/AutoRefresh";
 import { stepState } from "@/lib/process";
+import NeedsList from "@/components/NeedsList";
+import { getNeeds } from "@/lib/journey";
 
 type Task = {
   id: string;
@@ -32,9 +34,11 @@ function duration(ms: number) {
   return `about ${Math.round(h / 24)} days`;
 }
 
-export default async function DashboardPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function DashboardPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ finished?: string }> }) {
   const { id } = await params;
+  const { finished: finishedRun } = await searchParams;
   const supabase = await createClient();
+  const needs = await getNeeds(supabase, id);
   const [{ data: processes }, { data: stepRows }, { data: runRows }, { data: taskRows }] = await Promise.all([
     supabase.from("processes").select("id, name, version").eq("business_id", id).order("created_at"),
     supabase.from("process_steps").select("id, process_id, seq, title").eq("business_id", id).order("seq"),
@@ -50,50 +54,62 @@ export default async function DashboardPage({ params }: { params: Promise<{ id: 
   const steps = stepRows ?? [];
   const closed = ["done", "cancelled"];
 
-  const toCheck = tasks.filter((t) => t.status === "awaiting_review");
-  const toApprove = tasks.filter((t) => t.needs_approval && !t.approved_at && !closed.includes(t.status));
-  const stuck = tasks.filter((t) => ["blocked", "failed", "escalated"].includes(t.status));
-  const working = tasks.filter((t) => t.route === "claude" && t.status === "in_progress" && Date.now() - new Date(t.updated_at).getTime() < 8 * 60_000);
-  const needs = toCheck.length + toApprove.length + stuck.length;
+  const acting = needs.filter((n) => n.acts);
+  const waitingOn = needs.filter((n) => !n.acts);
+  const working = needs.filter((n) => n.kind === "working");
+  const justFinished = finishedRun ? runs.find((r) => r.id === finishedRun) : undefined;
+  const justFinishedName = justFinished ? (processes ?? []).find((p) => p.id === justFinished.process_id)?.name : undefined;
 
   return (
     <div className="max-w-5xl">
       {working.length > 0 && <AutoRefresh />}
-      <p className="hint">Run</p>
+      <p className="hint">Stage 3: Run</p>
       <h1 className="text-4xl font-bold leading-none sm:text-5xl">Dashboard</h1>
       <p className="mt-3 max-w-2xl text-[var(--muted)]">
-        What is running, what is waiting for you, and whether the agents are earning trust. Each process shows where its latest run has got to.
+        What needs you now, then how each process is going. Each line has one button that says what to do.
       </p>
 
-      <section className="mt-6" aria-label="Waiting for you">
-        {needs === 0 ? (
-          <div className="card p-4">
-            <p className="font-semibold">Nothing is waiting for you.</p>
-            {working.length > 0 && <p className="hint">Claude is working on {working.length} {working.length === 1 ? "step" : "steps"}.</p>}
+      {justFinished && (
+        <div className="mt-6 rounded border-2 border-[var(--go)] bg-[var(--go-tint)] p-4">
+          <p className="font-semibold">
+            Run finished{justFinishedName ? `: ${justFinishedName}` : ""}
+            {justFinished.subject ? `, ${justFinished.subject}` : ""}. Every step is done.
+          </p>
+          <Link className="mt-1 inline-block text-sm underline underline-offset-4" href={`/b/${id}/tasks?run=${justFinished.id}`}>See its steps and results</Link>
+        </div>
+      )}
+
+      <section className="mt-6" aria-labelledby="needs-heading">
+        <h2 id="needs-heading" className="display text-2xl font-bold">
+          What needs you now {acting.length > 0 && <span className="text-[var(--muted)]">{acting.length}</span>}
+        </h2>
+        {acting.length === 0 ? (
+          <div className="card mt-3 p-4">
+            <p className="font-semibold">Nothing needs you.</p>
+            <p className="hint">
+              {(processes ?? []).length === 0
+                ? "Work appears here once a process is written and run."
+                : "Work appears here when a run reaches a step that is yours, or a result that needs checking."}
+            </p>
+            <Link className="btn mt-3" href={`/b/${id}/processes`}>{(processes ?? []).length === 0 ? "Write your first process" : "Start a run"}</Link>
           </div>
         ) : (
-          <div className="grid gap-3 sm:grid-cols-3">
-            <Link href={`/b/${id}/tasks`} className="card block p-4 hover:bg-[#f7f8fa]">
-              <span className="display block text-4xl font-bold">{toCheck.length}</span>
-              <span className="font-semibold">Results to check</span>
-              <span className="hint block">Done by an agent, waiting for your yes or no</span>
-            </Link>
-            <Link href={`/b/${id}/tasks`} className="card block p-4 hover:bg-[#f7f8fa]">
-              <span className="display block text-4xl font-bold">{toApprove.length}</span>
-              <span className="font-semibold">Waiting for approval to start</span>
-              <span className="hint block">Tasks held at an approval gate</span>
-            </Link>
-            <Link href={`/b/${id}/tasks`} className="card block p-4 hover:bg-[#f7f8fa]">
-              <span className="display block text-4xl font-bold" style={stuck.length ? { color: "var(--stop)" } : undefined}>{stuck.length}</span>
-              <span className="font-semibold">Stuck</span>
-              <span className="hint block">Blocked, failed or handed to the fallback</span>
-            </Link>
+          <div className="mt-3">
+            <NeedsList needs={acting} />
+          </div>
+        )}
+        {waitingOn.length > 0 && (
+          <div className="mt-6">
+            <h3 className="font-semibold">Being done by someone else</h3>
+            <div className="mt-2">
+              <NeedsList needs={waitingOn} />
+            </div>
           </div>
         )}
       </section>
 
       <section className="mt-10" aria-label="Processes">
-        <h2 className="display text-2xl font-bold">Processes</h2>
+        <h2 className="display text-2xl font-bold">How each process is going</h2>
         {(processes ?? []).length === 0 ? (
           <div className="card mt-3 p-4">
             <p className="font-semibold">No process has been written yet.</p>
@@ -137,7 +153,7 @@ export default async function DashboardPage({ params }: { params: Promise<{ id: 
 
                   {!latest ? (
                     <p className="mt-3 text-sm">
-                      Not run yet. <Link className="underline underline-offset-4" href={`/b/${id}/processes/${p.id}#run`}>Start a run</Link>
+                      Not run yet. <Link className="font-semibold underline underline-offset-4" href={`/b/${id}/processes/${p.id}#run`}>Start a run</Link>
                     </p>
                   ) : (
                     <>
@@ -146,7 +162,14 @@ export default async function DashboardPage({ params }: { params: Promise<{ id: 
                       </p>
                       <div className="mt-2 flex flex-wrap items-center gap-3">
                         <StepStrip items={items} />
-                        <Link className="text-sm underline underline-offset-4" href={`/b/${id}/tasks?run=${latest.id}`}>Open the tasks</Link>
+                        {(() => {
+                          const cur = latestTasks.find((t) => !closed.includes(t.status));
+                          return cur ? (
+                            <Link className="text-sm font-semibold underline underline-offset-4" href={`/b/${id}/tasks?task=${cur.id}`}>Go to the current step</Link>
+                          ) : (
+                            <Link className="text-sm underline underline-offset-4" href={`/b/${id}/tasks?run=${latest.id}`}>See its steps and results</Link>
+                          );
+                        })()}
                       </div>
                     </>
                   )}
@@ -158,7 +181,7 @@ export default async function DashboardPage({ params }: { params: Promise<{ id: 
                       {finished.length > 0 && <dd className="hint">usually {duration(avgMs)}</dd>}
                     </div>
                     <div>
-                      <dt className="hint">Agent steps right first time</dt>
+                      <dt className="hint">AI steps right first time</dt>
                       <dd className="display text-2xl font-bold">{reviewed.length ? `${firstTime} of ${reviewed.length}` : "None yet"}</dd>
                     </div>
                     <div>
@@ -180,8 +203,8 @@ export default async function DashboardPage({ params }: { params: Promise<{ id: 
         )}
       </section>
       <p className="hint mt-8 max-w-2xl">
-        &ldquo;Agent steps right first time&rdquo; counts steps an agent did that a person checked and approved without sending back.
-        It shows how far an agent can be trusted on a step; it says nothing about how the business will do.
+        &ldquo;AI steps right first time&rdquo; counts steps an AI did that a person checked and approved without sending back.
+        It shows how far the AI can be trusted on a step; it says nothing about how the business will do.
       </p>
     </div>
   );

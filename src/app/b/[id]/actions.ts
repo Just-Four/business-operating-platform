@@ -1,6 +1,6 @@
 "use server";
 
-import { getOpenChallenges } from "@/lib/challenges";
+import { createChallengeTasks, getOpenChallenges } from "@/lib/challenges";
 import { randomUUID, randomBytes, createHash } from "crypto";
 import { runCheckpointReview, RESPONSES } from "@/lib/ai";
 
@@ -736,18 +736,23 @@ export async function runAiReview(formData: FormData) {
   let message: string | null = null;
   try {
     const r = await runCheckpointReview(supabase, businessId);
-    const { error } = await supabase.from("ai_reviews").insert({
-      business_id: businessId,
-      kind: "checkpoint",
-      session_key: key,
-      content: r.content,
-      model: r.model,
-      input_tokens: r.input_tokens,
-      output_tokens: r.output_tokens,
-      version: r.content.version ?? 1,
-      created_by: user?.id ?? null,
-    });
+    const { data: made, error } = await supabase
+      .from("ai_reviews")
+      .insert({
+        business_id: businessId,
+        kind: "checkpoint",
+        session_key: key,
+        content: r.content,
+        model: r.model,
+        input_tokens: r.input_tokens,
+        output_tokens: r.output_tokens,
+        version: r.content.version ?? 1,
+        created_by: user?.id ?? null,
+      })
+      .select("id")
+      .single();
     if (error) message = error.message;
+    else if (made) await createChallengeTasks(supabase, businessId, made.id, r.content.challenges ?? [], user?.id ?? null);
   } catch (e) {
     message = e instanceof Error ? e.message : "The AI review didn't complete. Try again.";
   }
@@ -808,8 +813,20 @@ export async function answerChallenge(formData: FormData) {
   const { data: saved, error } = await supabase.from("ai_reviews").update({ responses, responded_at: all ? new Date().toISOString() : null }).eq("id", reviewId).select("id");
   if (error || !(saved ?? []).length) fail(error?.message ?? "You can read this business but not change it.");
 
+  // The task that asked for this answer is done.
+  const { data: asked } = await supabase
+    .from("tasks")
+    .update({ status: "done", result: `Answered: ${RESPONSES[response]}` })
+    .eq("source_review_id", reviewId)
+    .eq("source_challenge", index)
+    .eq("kind", "challenge")
+    .neq("status", "done")
+    .select("id");
+  for (const t of asked ?? []) {
+    await supabase.from("task_events").insert({ business_id: businessId, task_id: t.id, event: "answered", actor: user?.email ?? "user", detail: RESPONSES[response] });
+  }
   if (response === "testing") {
-    const { data: existing } = await supabase.from("tasks").select("id").eq("source_review_id", reviewId).eq("source_challenge", index).neq("status", "cancelled").limit(1);
+    const { data: existing } = await supabase.from("tasks").select("id").eq("source_review_id", reviewId).eq("source_challenge", index).eq("kind", "test").neq("status", "cancelled").limit(1);
     if (!(existing ?? []).length) {
       const due = new Date();
       due.setDate(due.getDate() + 7);
@@ -824,6 +841,7 @@ export async function answerChallenge(formData: FormData) {
           due_date: due.toISOString().slice(0, 10),
           source_review_id: reviewId,
           source_challenge: index,
+          kind: "test",
           created_by: user?.id ?? null,
         })
         .select("id")
@@ -848,6 +866,18 @@ export async function answerChallenge(formData: FormData) {
       .is("approved_at", null);
   }
   revalidatePath(`/b/${businessId}`, "layout");
+  // Answered from the task list: go straight on to the next challenge, or home when there are none left.
+  if (formData.get("then") === "next") {
+    const { data: nextOne } = await supabase
+      .from("tasks")
+      .select("id")
+      .eq("business_id", businessId)
+      .eq("kind", "challenge")
+      .in("status", ["queued", "in_progress"])
+      .order("source_challenge")
+      .limit(1);
+    redirect(nextOne?.[0] ? `/b/${businessId}/tasks?task=${nextOne[0].id}&saved=1` : `/b/${businessId}?saved=1`);
+  }
   redirect(`${path}${path.includes("?") ? "&" : "?"}saved=1#challenge-${index}`);
 }
 

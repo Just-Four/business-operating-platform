@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { FOCUSED_GROUPS, LOOKBACK_SESSION, SESSIONS, iso, sessionTitle, type Session } from "@/lib/programme";
+import { DESIGN_SESSIONS, FOCUSED_GROUPS, LOOKBACK_SESSION, PLAN_SESSIONS, SESSIONS, iso, sessionTitle, type Session } from "@/lib/programme";
+import { getProgress } from "@/lib/progress";
+import { getJourney, getNeeds } from "@/lib/journey";
+import { getOpenChallenges } from "@/lib/challenges";
 import { saveSchedule, setRoute } from "../actions";
 import Notice from "@/components/Notice";
 
@@ -36,6 +39,9 @@ export default async function ProgrammePage({
     supabase.from("programme_sessions").select("key, scheduled_on, completed_at, approved_at").eq("business_id", id),
   ]);
   const byKey = new Map<string, Row>((rows ?? []).map((r) => [r.key, r]));
+  const [progress, needs, open] = await Promise.all([getProgress(supabase, id), getNeeds(supabase, id), getOpenChallenges(supabase, id)]);
+  const journey = await getJourney(supabase, id, { stage: biz?.stage ?? null, planning_route: biz?.planning_route ?? null }, progress, needs);
+  const buildRows = journey.stages.find((x) => x.key === "build")?.rows ?? [];
   const route = biz?.planning_route ?? "guided";
   const stage = biz?.stage ?? "launch";
   const today = iso(new Date());
@@ -48,16 +54,22 @@ export default async function ProgrammePage({
     const r = byKey.get(s.key);
     return r && !r.completed_at && r.scheduled_on && r.scheduled_on < today;
   }).length;
-  const next = sessions.find((s) => !byKey.get(s.key)?.completed_at);
-
-  const groups =
+  // The sessions sit in their stages, with Build between Design and Plan, the same order as the menu.
+  const groups: { title: string; items: Session[]; build?: boolean }[] =
     route === "focused"
       ? FOCUSED_GROUPS.map((g) => ({ title: g.title, items: sessions.filter((s) => g.keys.includes(s.key)) })).filter((g) => g.items.length)
-      : [{ title: "", items: sessions }];
+      : [
+          { title: "Stage 1: Design", items: sessions.filter((s) => DESIGN_SESSIONS.includes(s.key)) },
+          { title: "Stage 2: Build", items: sessions.filter((s) => s.key === "roles"), build: true },
+          { title: "Stage 3: Plan", items: sessions.filter((s) => PLAN_SESSIONS.includes(s.key)) },
+        ].filter((g) => g.items.length || g.build);
 
   const renderRow = (s: Session, n: number) => {
     const r = byKey.get(s.key);
-    const st = status({ completed_at: r?.completed_at ?? null, scheduled_on: r?.scheduled_on ?? null }, s.built, today);
+    const toAnswer = open && open.sessionKey === s.key ? open.unanswered : 0;
+    const st = toAnswer
+      ? { tone: "wait", text: `${toAnswer} to answer` }
+      : status({ completed_at: r?.completed_at ?? null, scheduled_on: r?.scheduled_on ?? null }, s.built, today);
     const title = sessionTitle(s.key, stage);
     return (
       <li
@@ -74,7 +86,13 @@ export default async function ProgrammePage({
           </Link>
           <span className="hint block">
             About {minutesOf(s)} min
-            {s.checkpoint ? (r?.approved_at ? ", reviewed" : ", review checkpoint: have your plan challenged") : ""}
+            {toAnswer
+              ? `. The review raised ${toAnswer} ${toAnswer === 1 ? "challenge" : "challenges"} that still ${toAnswer === 1 ? "needs" : "need"} your answer`
+              : s.checkpoint
+                ? r?.approved_at
+                  ? ", reviewed"
+                  : ", review checkpoint: have your plan challenged"
+                : ""}
           </span>
         </span>
         {route === "focused" ? (
@@ -114,16 +132,14 @@ export default async function ProgrammePage({
         </p>
       )}
 
-      {next && (
-        <Link href={`/b/${id}/s/${next.key}`} className="card mt-6 flex items-center justify-between gap-4 border-[var(--ink)] p-5 hover:bg-[#f7f8fa]">
-          <span>
-            <span className="hint block">{committed ? "Next session" : "Start here"}</span>
-            <span className="display text-2xl font-bold">{sessionTitle(next.key, stage)}</span>
-            <span className="hint block">About {minutesOf(next)} minutes</span>
-          </span>
-          <span className="btn">{next.built ? "Start session" : "View"}</span>
-        </Link>
-      )}
+      <Link href={journey.next.href} className="card mt-6 flex flex-wrap items-center justify-between gap-4 border-2 border-[var(--ink)] p-5 hover:bg-[#f7f8fa]">
+        <span className="min-w-0 flex-1">
+          <span className="hint block">Next thing to do. {journey.next.stage}</span>
+          <span className="display block text-2xl font-bold leading-tight">{journey.next.title}</span>
+          <span className="hint block">{journey.next.why}</span>
+        </span>
+        <span className="btn">{journey.next.label}</span>
+      </Link>
 
       <form action={saveSchedule} className="mt-10">
         <input type="hidden" name="business_id" value={id} />
@@ -133,10 +149,30 @@ export default async function ProgrammePage({
         </div>
 
         {groups.map((g, gi) => {
-          const first = byKey.get(g.items[0].key);
+          const first = g.items[0] ? byKey.get(g.items[0].key) : undefined;
           const total = g.items.reduce((a, s) => a + minutesOf(s), 0);
           return (
-            <section key={g.title || "all"} className={route === "focused" ? "mt-6" : ""}>
+            <section key={g.title || "all"} className="mt-6">
+              {route !== "focused" && <h3 className="display text-xl font-bold">{g.title}</h3>}
+              {g.build && (
+                <>
+                  <p className="hint">
+                    Not sessions with dates. Say how the business works and who is in the team before you plan the year.
+                  </p>
+                  <ul className="divide-y divide-[var(--line)]">
+                    {buildRows.map((r) => (
+                      <li key={r.href} className="grid grid-cols-[2.5rem_1fr_auto] items-center gap-3 py-3">
+                        <span />
+                        <span className="min-w-0">
+                          <Link href={r.href} className="font-semibold hover:underline hover:underline-offset-4">{r.title}</Link>
+                          <span className="hint block">{r.detail}</span>
+                        </span>
+                        {r.tag && <span className="tag w-24 justify-center" data-tone={r.tag.tone}>{r.tag.text}</span>}
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
               {route === "focused" && (
                 <div className="flex flex-wrap items-end justify-between gap-3 rounded bg-[var(--surface)] p-3">
                   <div>

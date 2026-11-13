@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { addTask, updateTask, createAgentKey, revokeAgentKey } from "../actions";
+import { addTask, answerChallenge, updateTask, createAgentKey, revokeAgentKey } from "../actions";
 import { approveResult, runWithClaude, sendBack } from "../process-actions";
 import Notice from "@/components/Notice";
 import AutoRefresh from "@/components/AutoRefresh";
@@ -8,6 +8,7 @@ import PendingButton from "@/components/PendingButton";
 import StepStrip from "@/components/StepStrip";
 import { CANVAS_BOXES, EVIDENCE_KINDS, ROUTES } from "@/lib/framework";
 import { CANVAS_PLAIN } from "@/lib/programme";
+import { RESPONSES } from "@/lib/ai";
 import { CLAUDE_STALE_MINUTES, stepState } from "@/lib/process";
 
 export const maxDuration = 300;
@@ -36,6 +37,8 @@ type Task = {
   review_note: string | null;
   rejections: number;
   source_review_id: string | null;
+  source_challenge: number | null;
+  kind: string | null;
   test_passed: boolean | null;
 };
 
@@ -134,7 +137,8 @@ export default async function TasksPage({
     const open = !closed.includes(t.status);
     const stuck = ["blocked", "failed", "escalated"].includes(t.status);
     const toClaude = t.route === "claude" && open && !working && !waiting && t.status !== "awaiting_review";
-    const toPerson = t.route === "person" && open && !waiting && t.status !== "awaiting_review";
+    const isChallenge = t.kind === "challenge";
+    const toPerson = t.route === "person" && open && !waiting && t.status !== "awaiting_review" && !isChallenge;
     const toAgent = !["claude", "person"].includes(t.route) && open && !waiting && t.status !== "awaiting_review";
     const routeLabel = ROUTES[t.route]?.label ?? t.route;
     return (
@@ -143,7 +147,7 @@ export default async function TasksPage({
           <div className="min-w-0 flex-1">
             {big ? <h1 className="text-3xl font-bold leading-tight">{t.title}</h1> : <h3 className="text-lg font-semibold leading-snug">{t.title}</h3>}
             <p className="hint">
-              {roleName(t.role_id)}
+              {t.kind === "challenge" ? "From your review" : t.kind === "test" ? "A test you set from your review" : roleName(t.role_id)}
               {t.due_date ? `, due ${day(t.due_date)}` : ""}
               {t.claimed_by ? `, picked up by ${t.claimed_by}` : ""}
               {!big && t.step_seq ? `, step ${t.step_seq} of a process` : ""}
@@ -235,6 +239,25 @@ export default async function TasksPage({
                 </form>
               </div>
             )}
+            {isChallenge && open && t.source_review_id && (
+              <form action={answerChallenge} className="space-y-3">
+                <input type="hidden" name="business_id" value={id} />
+                <input type="hidden" name="review_id" value={t.source_review_id} />
+                <input type="hidden" name="index" value={t.source_challenge ?? 0} />
+                <input type="hidden" name="return_to" value={here} />
+                <input type="hidden" name="then" value="next" />
+                <p className="text-sm font-semibold">Say what you&apos;ll do about it. One press, and you can change it later.</p>
+                <div className="flex flex-wrap gap-2">
+                  {Object.entries(RESPONSES).map(([k, v]) => (
+                    <button key={k} name="response" value={k} className="btn btn-secondary">{v}</button>
+                  ))}
+                </div>
+                <p className="hint">
+                  &ldquo;Will test it&rdquo; sets the smallest test above as a task for you, due in a week. &ldquo;Accept the risk&rdquo; adds it to
+                  your risks. Disagreeing is allowed.
+                </p>
+              </form>
+            )}
             {toPerson && (
               <form action={updateTask} className="space-y-3">
                 <input type="hidden" name="business_id" value={id} />
@@ -298,7 +321,7 @@ export default async function TasksPage({
                   : `No ${routeLabel} is connected to this business, so it will wait here. Connect one at the bottom of the Tasks page, or mark it done yourself under Other options.`}
               </p>
             )}
-            {t.status !== "awaiting_review" && (
+            {t.status !== "awaiting_review" && !isChallenge && (
               <details className="mt-3 text-sm">
                 <summary className="cursor-pointer text-[var(--muted)]">Other options</summary>
                 <div className="mt-3 flex flex-wrap items-end gap-2">

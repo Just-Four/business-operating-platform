@@ -7,7 +7,7 @@ import type { BusinessProgress } from "@/lib/progress";
 
 // ---------- What needs someone now ----------
 
-export type NeedKind = "check" | "approve" | "stuck" | "claude" | "person" | "working" | "agent";
+export type NeedKind = "check" | "approve" | "challenge" | "stuck" | "claude" | "person" | "working" | "agent";
 
 export type Need = {
   taskId: string;
@@ -19,16 +19,17 @@ export type Need = {
   acts: boolean; // false when nothing can be done yet (someone else is working on it)
   who: string | null;
   test?: boolean; // a test set from the review
+  seq?: number;
 };
 
-const ORDER: NeedKind[] = ["check", "approve", "stuck", "claude", "person", "working", "agent"];
+const ORDER: NeedKind[] = ["check", "approve", "challenge", "stuck", "claude", "person", "working", "agent"];
 const OPEN = ["queued", "in_progress", "blocked", "awaiting_approval", "awaiting_review", "failed", "escalated"];
 
 export async function getNeeds(supabase: SupabaseClient, businessId: string): Promise<Need[]> {
   const [{ data: tasks }, { data: roles }] = await Promise.all([
     supabase
       .from("tasks")
-      .select("id, title, status, route, role_id, needs_approval, approved_at, updated_at, rejections, process_run_id, created_at, source_review_id, due_date")
+      .select("id, title, status, route, role_id, needs_approval, approved_at, updated_at, rejections, process_run_id, created_at, source_review_id, source_challenge, due_date, kind")
       .eq("business_id", businessId)
       .in("status", OPEN)
       .order("created_at")
@@ -38,14 +39,19 @@ export async function getNeeds(supabase: SupabaseClient, businessId: string): Pr
   const now = Date.now();
   const today = new Date().toISOString().slice(0, 10);
   const needs: Need[] = (tasks ?? []).map((t) => {
-    const test = !!t.source_review_id;
+    const test = t.kind === "test";
+    const challenge = t.kind === "challenge";
     const routeLabel = ROUTES[t.route]?.label ?? t.route;
     const inProcess = !!t.process_run_id;
     let kind: NeedKind;
     let line: string;
     let label: string;
     let acts = true;
-    if (t.status === "awaiting_review") {
+    if (challenge) {
+      kind = "challenge";
+      line = "The review raised this. Say what you'll do about it. It takes one press.";
+      label = "Answer this";
+    } else if (t.status === "awaiting_review") {
       kind = "check";
       line = "The work is done. Check it before the next step starts.";
       label = "Check this result";
@@ -95,9 +101,10 @@ export async function getNeeds(supabase: SupabaseClient, businessId: string): Pr
       acts,
       who: (roles ?? []).find((r) => r.id === t.role_id)?.name ?? null,
       test,
+      seq: (t.source_challenge as number | null) ?? 0,
     };
   });
-  return needs.sort((a, b) => ORDER.indexOf(a.kind) - ORDER.indexOf(b.kind));
+  return needs.sort((a, b) => ORDER.indexOf(a.kind) - ORDER.indexOf(b.kind) || (a.seq ?? 0) - (b.seq ?? 0));
 }
 
 // ---------- The five stages ----------
@@ -332,7 +339,7 @@ export async function getJourney(
   let next: Journey["next"];
   if (acting[0]) {
     next = {
-      stage: acting[0].test ? "A test from your review" : "Stage 4 of 5: Run",
+      stage: acting[0].kind === "challenge" ? "From your review" : acting[0].test ? "A test from your review" : "Stage 4 of 5: Run",
       title: acting[0].title,
       why: acting.length > 1 ? `${acting[0].line} ${acting.length - 1} more below.` : acting[0].line,
       label: acting[0].label,

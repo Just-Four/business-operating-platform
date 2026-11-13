@@ -34,9 +34,38 @@ export async function getReviewTests(supabase: SupabaseClient, reviewId: string)
     .from("tasks")
     .select("id, status, due_date, test_passed, result, source_challenge, created_at")
     .eq("source_review_id", reviewId)
+    .eq("kind", "test")
     .neq("status", "cancelled")
     .order("created_at");
   const out: Record<string, TestTask> = {};
   for (const t of data ?? []) out[String(t.source_challenge)] = { id: t.id, status: t.status, due_date: t.due_date, test_passed: t.test_passed, result: t.result };
   return out;
+}
+
+type Ch = { area: string; problem: string; question: string; smallest_test: string };
+
+// Each challenge becomes a task the moment the review is run. Open challenge tasks from an earlier review
+// are cancelled, because the new review replaces it.
+export async function createChallengeTasks(supabase: SupabaseClient, businessId: string, reviewId: string, challenges: Ch[], userId: string | null) {
+  await supabase
+    .from("tasks")
+    .update({ status: "cancelled" })
+    .eq("business_id", businessId)
+    .eq("kind", "challenge")
+    .neq("source_review_id", reviewId)
+    .in("status", ["queued", "in_progress", "blocked"]);
+  if (!challenges.length) return;
+  await supabase.from("tasks").insert(
+    challenges.map((c, i) => ({
+      business_id: businessId,
+      title: `Answer the review: ${c.area}`.slice(0, 140),
+      detail: `${c.problem}\n\n${c.question}\n\nSmallest test: ${c.smallest_test}`,
+      route: "person",
+      status: "queued",
+      source_review_id: reviewId,
+      source_challenge: i,
+      kind: "challenge",
+      created_by: userId,
+    }))
+  );
 }

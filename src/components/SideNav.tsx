@@ -17,6 +17,9 @@ export default function SideNav({
   planStops,
   planNote,
   waiting,
+  next,
+  buildNotes,
+  reviewNote,
 }: {
   businessId: string;
   guided: boolean;
@@ -25,6 +28,9 @@ export default function SideNav({
   planStops: RouteStop[];
   planNote: string;
   waiting: number;
+  next: { title: string; href: string };
+  buildNotes: Record<string, string>;
+  reviewNote: string;
 }) {
   const pathname = usePathname();
   const base = `/b/${businessId}`;
@@ -33,7 +39,7 @@ export default function SideNav({
   const onDesign = DESIGN_PAGES.includes(first) || (first === "s" && DESIGN_SESSIONS.includes(parts[1]));
   const onPlan = PLAN_PAGES.includes(first) || (first === "s" && PLAN_SESSIONS.includes(parts[1]));
 
-  const Item = ({ href, label, badge }: { href: string; label: string; badge?: number }) => {
+  const Item = ({ href, label, badge, note }: { href: string; label: string; badge?: number; note?: string }) => {
     const current = pathname === href || (href !== base && pathname.startsWith(`${href}/`));
     return (
       <Link
@@ -43,6 +49,7 @@ export default function SideNav({
       >
         <span>{label}</span>
         {badge ? <span className="rounded-full bg-[var(--wait)] px-2 text-xs font-bold text-[var(--ink)]">{badge}</span> : null}
+        {note ? <span className={`shrink-0 pl-2 text-[12px] ${note === "Complete" ? "text-white/55" : "text-[#f3c869]"}`}>{note === "Complete" ? "Done" : note}</span> : null}
       </Link>
     );
   };
@@ -56,7 +63,11 @@ export default function SideNav({
   return (
     <nav className="mt-6 flex-1 text-sm" aria-label="Business">
       <Item href={base} label="Home: what to do next" />
-      <Item href={`${base}/dashboard`} label="Dashboard" badge={waiting} />
+      <Item href={`${base}/dashboard`} label="Dashboard: your to-do list" badge={waiting} />
+      <Link href={next.href} className="mt-3 block rounded border border-[#f3c869] px-3 py-2 hover:bg-white/10">
+        <span className="block text-[11px] uppercase tracking-wide text-[#f3c869]">Next thing to do</span>
+        <span className="block font-semibold leading-snug">{next.title}</span>
+      </Link>
 
       <Head n={1} title="Design" />
       <details key={onDesign ? "design-open" : "design-closed"} open={onDesign}>
@@ -72,10 +83,10 @@ export default function SideNav({
       </details>
 
       <Head n={2} title="Build" />
-      <Item href={`${base}/story`} label="How the business works" />
-      <Item href={`${base}/people`} label="Team" />
-      <Item href={`${base}/processes`} label="Processes" />
-      <Item href={`${base}/team`} label="Roles" />
+      <Item href={`${base}/story`} label="How the business works" note={buildNotes[`${base}/story`]} />
+      <Item href={`${base}/people`} label="Team" note={buildNotes[`${base}/people`]} />
+      <Item href={`${base}/processes`} label="Processes" note={buildNotes[`${base}/processes`]} />
+      <Item href={`${base}/team`} label="Roles" note={buildNotes[`${base}/team`]} />
 
       <Head n={3} title="Plan" />
       <details key={onPlan ? "plan-open" : "plan-closed"} open={onPlan}>
@@ -84,7 +95,7 @@ export default function SideNav({
           <SideRoute businessId={businessId} stops={planStops} />
           {!guided && (
             <div className="mt-3 space-y-1">
-              <Item href={`${base}/s/sign_off`} label="Have the plan reviewed" />
+              <Item href={`${base}/s/sign_off`} label="Have the plan reviewed" note={reviewNote} />
               <Link href={`${base}/year#lock`} className="block rounded px-2 py-1.5 hover:bg-white/10">Lock the plan</Link>
             </div>
           )}

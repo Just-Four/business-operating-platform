@@ -6,7 +6,8 @@ import Notice from "@/components/Notice";
 import AutoRefresh from "@/components/AutoRefresh";
 import PendingButton from "@/components/PendingButton";
 import StepStrip from "@/components/StepStrip";
-import { ROUTES } from "@/lib/framework";
+import { CANVAS_BOXES, EVIDENCE_KINDS, ROUTES } from "@/lib/framework";
+import { CANVAS_PLAIN } from "@/lib/programme";
 import { CLAUDE_STALE_MINUTES, stepState } from "@/lib/process";
 
 export const maxDuration = 300;
@@ -34,6 +35,8 @@ type Task = {
   review_required: boolean;
   review_note: string | null;
   rejections: number;
+  source_review_id: string | null;
+  test_passed: boolean | null;
 };
 
 const STATUS: Record<string, { label: string; tone: string }> = {
@@ -238,13 +241,53 @@ export default async function TasksPage({
                 <input type="hidden" name="task_id" value={t.id} />
                 <input type="hidden" name="action" value="done" />
                 <input type="hidden" name="return_to" value={here} />
-                <p className="text-sm font-semibold">
-                  {stuck ? "This is stuck. " : ""}
-                  This one is done by a person. Do it, write or paste the result here, then mark it done.
-                  {t.process_run_id ? " The next step starts by itself." : ""}
-                </p>
-                <textarea className="input min-h-24" name="result" aria-label="The result" placeholder="The result, or what was done" />
-                <PendingButton label="Mark done" pending="Saving..." />
+                {t.source_review_id ? (
+                  <>
+                    <p className="text-sm font-semibold">This is a test you set from your review. Do it, then say what happened.</p>
+                    <fieldset>
+                      <legend className="label">Did it pass?</legend>
+                      <div className="flex flex-wrap gap-4 text-sm">
+                        <label className="flex items-center gap-2"><input type="radio" name="test_passed" value="yes" required /> Yes, it passed</label>
+                        <label className="flex items-center gap-2"><input type="radio" name="test_passed" value="no" required /> No, it didn&apos;t</label>
+                      </div>
+                    </fieldset>
+                    <div>
+                      <label className="label" htmlFor="test-result">What happened?</label>
+                      <textarea className="input min-h-24" id="test-result" name="result" required placeholder="What you did, and the numbers: how many you asked, how many said yes, what they handed over" />
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div>
+                        <label className="label" htmlFor="evidence_box">If it passed, which part of the business model does it prove?</label>
+                        <select className="input" id="evidence_box" name="evidence_box" defaultValue="">
+                          <option value="">None, or not sure</option>
+                          {CANVAS_BOXES.map((b) => (
+                            <option key={b.key} value={b.key}>{CANVAS_PLAIN[b.key]?.question ?? b.title}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="label" htmlFor="evidence_kind">What do you have to show for it?</label>
+                        <select className="input" id="evidence_kind" name="evidence_kind" defaultValue="conversation">
+                          {EVIDENCE_KINDS.map((k) => (
+                            <option key={k.key} value={k.key}>{k.label} ({k.strength})</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                    <p className="hint">If it passed and you pick a part, what happened is added to that part as evidence.</p>
+                    <PendingButton label="Record the result" pending="Saving..." />
+                  </>
+                ) : (
+                  <>
+                    <p className="text-sm font-semibold">
+                      {stuck ? "This is stuck. " : ""}
+                      This one is done by a person. Do it, write or paste the result here, then mark it done.
+                      {t.process_run_id ? " The next step starts by itself." : ""}
+                    </p>
+                    <textarea className="input min-h-24" name="result" aria-label="The result" placeholder="The result, or what was done" />
+                    <PendingButton label="Mark done" pending="Saving..." />
+                  </>
+                )}
               </form>
             )}
             {toAgent && (

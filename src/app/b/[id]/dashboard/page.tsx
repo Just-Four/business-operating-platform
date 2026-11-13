@@ -100,7 +100,7 @@ export default async function DashboardPage({ params, searchParams }: { params: 
         )}
         {waitingOn.length > 0 && (
           <div className="mt-6">
-            <h3 className="font-semibold">Being done by someone else</h3>
+            <h3 className="font-semibold">Not needing you yet</h3>
             <div className="mt-2">
               <NeedsList needs={waitingOn} />
             </div>

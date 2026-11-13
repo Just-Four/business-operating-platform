@@ -9,6 +9,7 @@ import Notice from "@/components/Notice";
 import NeedsList from "@/components/NeedsList";
 import BusinessMap from "@/components/BusinessMap";
 import { getFunctions } from "@/lib/functions";
+import { getOpenChallenges } from "@/lib/challenges";
 
 const ORDER: Stage[] = ["launch", "early_revenue", "established"];
 const STATE_TAG = {
@@ -30,7 +31,8 @@ export default async function BusinessHome({
   const { data: biz } = await supabase.from("businesses").select("name, stage, model, sector, planning_route").eq("id", id).single();
   if (biz && !biz.planning_route) redirect(`/b/${id}/start`);
   const stage = (biz?.stage ?? "launch") as Stage;
-  const [progress, needs, functions] = await Promise.all([getProgress(supabase, id), getNeeds(supabase, id), getFunctions(supabase, id)]);
+  const [progress, needs, functions, challenges] = await Promise.all([getProgress(supabase, id), getNeeds(supabase, id), getFunctions(supabase, id), getOpenChallenges(supabase, id)]);
+  const openTests = needs.filter((n) => n.test);
   const journey = await getJourney(supabase, id, { stage: biz?.stage ?? null, planning_route: biz?.planning_route ?? null }, progress, needs);
   const acting = needs.filter((n) => n.acts);
 
@@ -54,6 +56,36 @@ export default async function BusinessHome({
           </Link>
         </div>
       </section>
+
+      {challenges && challenges.unanswered > 0 && (
+        <section className="card mt-4 flex flex-wrap items-center gap-4 p-5" aria-label="Challenges from your review">
+          <div className="min-w-0 flex-1">
+            <p className="font-semibold">
+              {challenges.unanswered} {challenges.unanswered === 1 ? "challenge" : "challenges"} from your review still {challenges.unanswered === 1 ? "needs" : "need"} an answer
+            </p>
+            <p className="hint">
+              {challenges.criticalUnanswered > 0
+                ? `${challenges.criticalUnanswered} ${challenges.criticalUnanswered === 1 ? "is" : "are"} critical. The plan can't be locked until ${challenges.criticalUnanswered === 1 ? "it has" : "they have"} an answer. `
+                : ""}
+              Each takes one press.
+            </p>
+          </div>
+          <Link className="btn btn-secondary" href={`/b/${id}/s/${challenges.sessionKey}#challenges`}>Answer them</Link>
+        </section>
+      )}
+      {openTests.length > 0 && (
+        <section className="card mt-4 p-5" aria-label="Tests you have set">
+          <p className="font-semibold">{openTests.length === 1 ? "A test you've set from your review" : `${openTests.length} tests you've set from your review`}</p>
+          <ul className="mt-2 space-y-1 text-sm">
+            {openTests.map((n) => (
+              <li key={n.taskId}>
+                <Link className="underline underline-offset-4" href={n.href}>{n.title}</Link>
+                <span className="hint"> {n.line.replace("A test you set from your review, ", "").replace(" Do it, then say what happened.", "")}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {acting.length > 1 && (
         <section className="mt-8" aria-labelledby="needs-heading">

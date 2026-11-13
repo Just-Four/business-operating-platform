@@ -18,6 +18,7 @@ export type Need = {
   href: string;
   acts: boolean; // false when nothing can be done yet (someone else is working on it)
   who: string | null;
+  test?: boolean; // a test set from the review
 };
 
 const ORDER: NeedKind[] = ["check", "approve", "stuck", "claude", "person", "working", "agent"];
@@ -27,7 +28,7 @@ export async function getNeeds(supabase: SupabaseClient, businessId: string): Pr
   const [{ data: tasks }, { data: roles }] = await Promise.all([
     supabase
       .from("tasks")
-      .select("id, title, status, route, role_id, needs_approval, approved_at, updated_at, rejections, process_run_id, created_at")
+      .select("id, title, status, route, role_id, needs_approval, approved_at, updated_at, rejections, process_run_id, created_at, source_review_id, due_date")
       .eq("business_id", businessId)
       .in("status", OPEN)
       .order("created_at")
@@ -35,7 +36,9 @@ export async function getNeeds(supabase: SupabaseClient, businessId: string): Pr
     supabase.from("roles").select("id, name").eq("business_id", businessId),
   ]);
   const now = Date.now();
+  const today = new Date().toISOString().slice(0, 10);
   const needs: Need[] = (tasks ?? []).map((t) => {
+    const test = !!t.source_review_id;
     const routeLabel = ROUTES[t.route]?.label ?? t.route;
     const inProcess = !!t.process_run_id;
     let kind: NeedKind;
@@ -68,8 +71,14 @@ export async function getNeeds(supabase: SupabaseClient, businessId: string): Pr
       }
     } else if (t.route === "person") {
       kind = "person";
-      line = inProcess ? "A person does this step, then records the result." : "A person does this.";
-      label = inProcess ? "Do this step" : "Do this task";
+      line = test
+        ? `A test you set from your review${t.due_date ? `, due ${t.due_date}` : ""}. Do it, then say what happened.`
+        : inProcess
+          ? "A person does this step, then records the result."
+          : "A person does this.";
+      label = test ? "Record the result" : inProcess ? "Do this step" : "Do this task";
+      // A test takes days. It only becomes the next thing to do once it is due.
+      if (test && t.due_date && t.due_date > today) acts = false;
     } else {
       kind = "agent";
       line = `Waiting for ${routeLabel} to pick this up.`;
@@ -85,6 +94,7 @@ export async function getNeeds(supabase: SupabaseClient, businessId: string): Pr
       href: `/b/${businessId}/tasks?task=${t.id}`,
       acts,
       who: (roles ?? []).find((r) => r.id === t.role_id)?.name ?? null,
+      test,
     };
   });
   return needs.sort((a, b) => ORDER.indexOf(a.kind) - ORDER.indexOf(b.kind));
@@ -322,7 +332,7 @@ export async function getJourney(
   let next: Journey["next"];
   if (acting[0]) {
     next = {
-      stage: "Stage 4 of 5: Run",
+      stage: acting[0].test ? "A test from your review" : "Stage 4 of 5: Run",
       title: acting[0].title,
       why: acting.length > 1 ? `${acting[0].line} ${acting.length - 1} more below.` : acting[0].line,
       label: acting[0].label,

@@ -4,8 +4,9 @@ import { createClient } from "@/lib/supabase/server";
 import { CANVAS_PLAIN, LOOKBACK_MEASURES, LOOKBACK_SESSION, SESSIONS, TECH_TERM, sessionByKey, sessionTitle } from "@/lib/programme";
 import { guidanceFor } from "@/lib/guidance";
 import { CANVAS_BOXES, gradeOf, type EvidenceStrength } from "@/lib/framework";
-import { addEvidence, deleteEvidence, recordReview, finishSession, saveCanvas, saveDiagnosis, saveLookback, runAiReview, acceptAiReview } from "../../actions";
+import { addEvidence, deleteEvidence, recordReview, finishSession, saveCanvas, saveDiagnosis, saveLookback, runAiReview } from "../../actions";
 import AiReviewCard from "@/components/AiReviewCard";
+import { getReviewTests } from "@/lib/challenges";
 import PendingButton from "@/components/PendingButton";
 import { RESPONSES, type CheckpointReview } from "@/lib/ai";
 
@@ -52,6 +53,7 @@ export default async function SessionPage({
   const { data: aiReview } = isCheckpoint
     ? await supabase.from("ai_reviews").select("id, content, created_at, responses").eq("business_id", id).eq("kind", "checkpoint").eq("session_key", key).order("created_at", { ascending: false }).limit(1).maybeSingle()
     : { data: null };
+  const reviewTests = aiReview ? await getReviewTests(supabase, aiReview.id) : {};
   const [{ data: biz }, { data: row }, { data: me }, { data: canvas }, { data: evidence }, { data: diag }] = await Promise.all([
     supabase.from("businesses").select("name, model, stage, currency, planning_route").eq("id", id).single(),
     supabase.from("programme_sessions").select("scheduled_on, completed_at, approved_at, review_type, reviewer_name, reviewer_role, review_notes").eq("business_id", id).eq("key", key).maybeSingle(),
@@ -320,8 +322,15 @@ export default async function SessionPage({
               </form>
             ) : null}
             {row?.approved_at && aiReview ? (
-              <AiReviewCard review={aiReview.content as CheckpointReview} createdAt={aiReview.created_at} responses={aiReview.responses as Record<string, string>} />
+              <AiReviewCard
+                review={aiReview.content as CheckpointReview}
+                createdAt={aiReview.created_at}
+                responses={aiReview.responses as Record<string, string>}
+                answer={{ businessId: id, reviewId: aiReview.id, returnTo: here }}
+                tests={reviewTests}
+              />
             ) : null}
+            {row?.approved_at && !row?.completed_at && !standalone ? <FinishForm id={id} sessionKey={key} label="Carry on" /> : null}
             {row?.approved_at ? null : (
               <div className="space-y-4">
                 <h2 id="review-options" className="scroll-mt-6 text-2xl font-bold">Who should review it?</h2>
@@ -380,42 +389,23 @@ export default async function SessionPage({
                 </div>
                 {aiReview && (
                   <>
-                    <AiReviewCard review={aiReview.content as CheckpointReview} createdAt={aiReview.created_at} responses={aiReview.responses as Record<string, string>} />
-                    <form action={acceptAiReview} className="card space-y-4 p-5">
-                      <input type="hidden" name="business_id" value={id} />
-                      <input type="hidden" name="session_key" value={key} />
-                      <input type="hidden" name="review_id" value={aiReview.id} />
-                      <div>
-                        <h3 className="display text-xl font-bold">Your response</h3>
-                        <p className="hint mt-1">
-                          Say what you&apos;ll do about each challenge. Disagreeing is allowed: it&apos;s how the reviewer
-                          learns which challenges matter.
-                        </p>
-                      </div>
-                      {(aiReview.content as CheckpointReview).challenges.map((c, i) => (
-                        <div key={i} className="grid gap-2 sm:grid-cols-[1fr_15rem] sm:items-center">
-                          <label htmlFor={`resp_${i}`} className="text-sm">
-                            <span className="font-semibold">{i + 1}. {c.area}</span>
-                          </label>
-                          <select id={`resp_${i}`} name={`resp_${i}`} required className="input" defaultValue="">
-                            <option value="" disabled>Choose</option>
-                            {Object.entries(RESPONSES).map(([k, v]) => (
-                              <option key={k} value={k}>{v}</option>
-                            ))}
-                          </select>
-                        </div>
-                      ))}
-                      <label className="label" htmlFor="ai_notes">What will you change or test first?</label>
-                      <textarea id="ai_notes" name="review_notes" required rows={3} className="input" />
-                      <button className="btn">Mark the checkpoint reviewed and carry on</button>
-                    </form>
+                    <AiReviewCard
+                      review={aiReview.content as CheckpointReview}
+                      createdAt={aiReview.created_at}
+                      responses={aiReview.responses as Record<string, string>}
+                      answer={{ businessId: id, reviewId: aiReview.id, returnTo: here }}
+                      tests={reviewTests}
+                    />
                   </>
                 )}
 
                 {!standalone && (
                   <div className="flex flex-wrap items-center gap-3">
                     <FinishForm id={id} sessionKey={key} label="Carry on and review later" quiet />
-                    <span className="hint">The plan can&apos;t be signed off until this has been reviewed.</span>
+                    <span className="hint">
+                      Any challenge you haven&apos;t answered stays on your home page until you do. The plan can&apos;t be locked while a
+                      critical one is unanswered.
+                    </span>
                   </div>
                 )}
               </div>

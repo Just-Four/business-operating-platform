@@ -679,7 +679,7 @@ export default async function YearPage({
               ) : (
                 <>
                   <p className="text-sm">
-                    {bs.length} of 3 battles set, numbers {b ? "entered" : "not entered"}. The plan must have been challenged first, by the AI review or by someone else.
+                    {bs.length} of 3 battles set, numbers {b ? "entered" : "not entered"}. The plan must have been challenged first, by the AI review or by someone else, and every critical challenge from the review answered.
                   </p>
                   <button className="btn" disabled={!b || bs.length === 0}>Lock the plan</button>
                 </>

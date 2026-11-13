@@ -1,4 +1,14 @@
+import Link from "next/link";
 import { CHECKS, PEOPLE_QUESTIONS, RESPONSES, tally, type CheckpointReview } from "@/lib/ai";
+import type { TestTask } from "@/lib/challenges";
+import { answerChallenge } from "@/app/b/[id]/actions";
+
+const ANSWER_HELP: Record<string, string> = {
+  fixed: "You've changed the plan to deal with it.",
+  testing: "Sets the test below as a task for you, due in a week.",
+  accepted: "Adds it to your list of risks.",
+  ignored: "You don't think it matters. Kept with the review.",
+};
 
 const READY: Record<string, { tone: string; text: string }> = {
   ready: { tone: "go", text: "Ready for the next step" },
@@ -15,11 +25,17 @@ export default function AiReviewCard({
   review,
   createdAt,
   responses,
+  answer,
+  tests,
 }: {
   review: CheckpointReview;
   createdAt: string;
   responses?: Record<string, string> | null;
+  // When given, each challenge can be answered with one press.
+  answer?: { businessId: string; reviewId: string; returnTo: string };
+  tests?: Record<string, TestTask>;
 }) {
+  const unanswered = review.challenges.filter((_, i) => !responses?.[String(i)]).length;
   const r = READY[review.readiness] ?? READY.nearly;
   const checks = review.checks ?? [];
   const t = tally(checks);
@@ -80,16 +96,29 @@ export default function AiReviewCard({
         </div>
       )}
 
+      {review.challenges.length > 0 && answer && (
+        <div id="challenges" className="scroll-mt-6 border-b border-[var(--line)] bg-[var(--paper)] p-5">
+          <h4 className="font-semibold">
+            {unanswered === 0
+              ? `All ${review.challenges.length} challenges answered.`
+              : `${unanswered} of ${review.challenges.length} challenges still ${unanswered === 1 ? "needs" : "need"} an answer.`}
+          </h4>
+          <p className="hint mt-1">
+            Answer each one with one press. &ldquo;Will test it&rdquo; sets the test as a task. &ldquo;Accept the risk&rdquo; adds it to
+            your risks. Disagreeing is allowed. You can change an answer later.
+          </p>
+        </div>
+      )}
       {review.challenges.length > 0 && (
         <ol className="divide-y divide-[var(--line)]">
           {review.challenges.map((c, i) => (
-            <li key={i} className="grid gap-3 p-5 sm:grid-cols-[2rem_1fr]">
+            <li key={i} id={`challenge-${i}`} className="grid scroll-mt-6 gap-3 p-5 sm:grid-cols-[2rem_1fr]">
               <span className="display text-2xl font-bold text-[var(--muted)]">{i + 1}</span>
               <div>
                 <div className="flex flex-wrap items-center gap-2">
                   <h4 className="font-semibold">{c.area}</h4>
                   <span className="tag" data-tone={SEV[c.severity]?.tone}>{SEV[c.severity]?.text}</span>
-                  {responses?.[String(i)] && <span className="tag" data-tone="quiet">You: {RESPONSES[responses[String(i)]]}</span>}
+                  {responses?.[String(i)] ? <span className="tag" data-tone="quiet">You: {RESPONSES[responses[String(i)]]}</span> : answer ? <span className="tag" data-tone="wait">Needs an answer</span> : null}
                 </div>
                 <p className="mt-1">{c.problem}</p>
                 <p className="mt-3 font-semibold">{c.question}</p>
@@ -97,6 +126,48 @@ export default function AiReviewCard({
                   <span className="font-semibold">Smallest test: </span>
                   {c.smallest_test}
                 </p>
+                {tests?.[String(i)] && answer && (
+                  <p className="mt-2 text-sm">
+                    {tests[String(i)].status === "done" ? (
+                      <>
+                        <span className="tag" data-tone={tests[String(i)].test_passed === false ? "stop" : tests[String(i)].test_passed ? "go" : "quiet"}>
+                          {tests[String(i)].test_passed === false ? "Tested: did not pass" : tests[String(i)].test_passed ? "Tested: passed" : "Test done"}
+                        </span>{" "}
+                        {tests[String(i)].result}
+                      </>
+                    ) : (
+                      <>
+                        This test is set as a task{tests[String(i)].due_date ? `, due ${tests[String(i)].due_date}` : ""}.{" "}
+                      </>
+                    )}{" "}
+                    <Link className="font-semibold underline underline-offset-4" href={`/b/${answer.businessId}/tasks?task=${tests[String(i)].id}`}>
+                      Open the task
+                    </Link>
+                  </p>
+                )}
+                {answer && (
+                  <form action={answerChallenge} className="mt-3">
+                    <input type="hidden" name="business_id" value={answer.businessId} />
+                    <input type="hidden" name="review_id" value={answer.reviewId} />
+                    <input type="hidden" name="index" value={i} />
+                    <input type="hidden" name="return_to" value={answer.returnTo} />
+                    <p className="hint mb-2">{responses?.[String(i)] ? "Your answer. Press another to change it." : "Your answer:"}</p>
+                    <div className="flex flex-wrap gap-2">
+                      {Object.entries(RESPONSES).map(([k, v]) => (
+                        <button
+                          key={k}
+                          name="response"
+                          value={k}
+                          title={ANSWER_HELP[k]}
+                          aria-pressed={responses?.[String(i)] === k}
+                          className={responses?.[String(i)] === k ? "btn" : "btn btn-secondary"}
+                        >
+                          {v}
+                        </button>
+                      ))}
+                    </div>
+                  </form>
+                )}
               </div>
             </li>
           ))}

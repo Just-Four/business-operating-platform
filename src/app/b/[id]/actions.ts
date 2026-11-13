@@ -1,5 +1,6 @@
 "use server";
 
+import { getOpenChallenges } from "@/lib/challenges";
 import { randomUUID, randomBytes, createHash } from "crypto";
 import { runCheckpointReview, RESPONSES } from "@/lib/ai";
 
@@ -653,6 +654,8 @@ export async function updateTask(formData: FormData) {
   else if (action === "done") {
     patch.status = "done";
     patch.result = str(formData, "result");
+    const passed = str(formData, "test_passed");
+    if (passed) patch.test_passed = passed === "yes";
   } else if (action === "block") patch.status = "blocked";
   else if (action === "cancel") patch.status = "cancelled";
   else if (action === "requeue") patch.status = "queued";
@@ -664,6 +667,21 @@ export async function updateTask(formData: FormData) {
       event: action === "approve" ? "approved" : `marked ${String(patch.status ?? action).replace("_", " ")}`,
       actor,
       detail: str(formData, "result"),
+    });
+  }
+  // A test that passed can be filed as evidence against the part of the business model it proves.
+  const box = str(formData, "evidence_box");
+  const kind = str(formData, "evidence_kind");
+  if (!error && action === "done" && str(formData, "test_passed") === "yes" && box && kind && str(formData, "result")) {
+    await supabase.from("evidence").insert({
+      business_id: businessId,
+      subject_type: "canvas",
+      subject_key: box,
+      kind,
+      summary: (str(formData, "result") ?? "").slice(0, 500),
+      source: "A test set from the review",
+      evidence_date: new Date().toISOString().slice(0, 10),
+      created_by: user?.id ?? null,
     });
   }
   if (!error && action === "done") {
@@ -765,6 +783,72 @@ export async function acceptAiReview(formData: FormData) {
   if (error) redirect(`/b/${businessId}/s/${key}?error=${encodeURIComponent(error.message)}`);
   revalidatePath(`/b/${businessId}`, "layout");
   redirect(await completeSessionInternal(supabase, businessId, key));
+}
+
+// One challenge answered with one press. "Will test it" sets the test as a task; "Accept the risk" adds it to the risks.
+export async function answerChallenge(formData: FormData) {
+  const businessId = String(formData.get("business_id"));
+  const reviewId = String(formData.get("review_id"));
+  const index = Number(formData.get("index"));
+  const response = String(formData.get("response"));
+  const returnTo = str(formData, "return_to") ?? `/b/${businessId}`;
+  const [path] = returnTo.split("#");
+  const fail = (msg: string): never => redirect(`${path}${path.includes("?") ? "&" : "?"}error=${encodeURIComponent(msg)}`);
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!(response in RESPONSES)) fail("Choose one of the four answers.");
+  const { data: review } = await supabase.from("ai_reviews").select("id, content, responses, session_key").eq("id", reviewId).eq("business_id", businessId).maybeSingle();
+  const challenges = ((review?.content as { challenges?: { area: string; severity: string; problem: string; question: string; smallest_test: string }[] })?.challenges ?? []);
+  const c = challenges[index];
+  if (!review || !c) fail("That challenge could not be found.");
+  const responses = { ...((review!.responses ?? {}) as Record<string, string>), [String(index)]: response };
+  const all = challenges.every((_, i) => responses[String(i)]);
+  const { data: saved, error } = await supabase.from("ai_reviews").update({ responses, responded_at: all ? new Date().toISOString() : null }).eq("id", reviewId).select("id");
+  if (error || !(saved ?? []).length) fail(error?.message ?? "You can read this business but not change it.");
+
+  if (response === "testing") {
+    const { data: existing } = await supabase.from("tasks").select("id").eq("source_review_id", reviewId).eq("source_challenge", index).neq("status", "cancelled").limit(1);
+    if (!(existing ?? []).length) {
+      const due = new Date();
+      due.setDate(due.getDate() + 7);
+      const { data: task } = await supabase
+        .from("tasks")
+        .insert({
+          business_id: businessId,
+          title: `Test: ${c.area}`.slice(0, 140),
+          detail: `${c.question}\n\nThe test: ${c.smallest_test}`,
+          route: "person",
+          status: "queued",
+          due_date: due.toISOString().slice(0, 10),
+          source_review_id: reviewId,
+          source_challenge: index,
+          created_by: user?.id ?? null,
+        })
+        .select("id")
+        .single();
+      if (task) await supabase.from("task_events").insert({ business_id: businessId, task_id: task.id, event: "set as a test from the review", actor: user?.email ?? "user" });
+    }
+  }
+  if (response === "accepted") {
+    const text = `${c.area}: ${c.problem}`;
+    const { data: existing } = await supabase.from("risks").select("id").eq("business_id", businessId).eq("risk", text).limit(1);
+    if (!(existing ?? []).length) {
+      await supabase.from("risks").insert({ business_id: businessId, risk: text, likelihood: "medium", impact: c.severity === "critical" ? "high" : "medium", status: "watching" });
+    }
+  }
+  // Every challenge answered: the checkpoint counts as reviewed.
+  if (all && review!.session_key) {
+    await supabase
+      .from("programme_sessions")
+      .update({ approved_at: new Date().toISOString(), approved_by: user?.id ?? null, review_type: "ai" })
+      .eq("business_id", businessId)
+      .eq("key", review!.session_key)
+      .is("approved_at", null);
+  }
+  revalidatePath(`/b/${businessId}`, "layout");
+  redirect(`${path}${path.includes("?") ? "&" : "?"}saved=1#challenge-${index}`);
 }
 
 // ---------- Part 5: this year ----------
@@ -1205,6 +1289,16 @@ export async function lockPlan(formData: FormData) {
     ]);
     if (!(approved ?? []).length && !(ai ?? []).length) {
       return done(formData, supabase, businessId, "year", "Get the plan challenged before you lock it: run the AI review or record a review by someone else.");
+    }
+    const open = await getOpenChallenges(supabase, businessId);
+    if (open && open.criticalUnanswered > 0) {
+      return done(
+        formData,
+        supabase,
+        businessId,
+        "year",
+        `Answer the critical challenges from your review before you lock: ${open.criticalUnanswered} still ${open.criticalUnanswered === 1 ? "needs" : "need"} an answer. Disagreeing counts as an answer.`
+      );
     }
   }
   const { error } = await supabase

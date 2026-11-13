@@ -177,6 +177,13 @@ export default async function SessionPage({
               <p className="hint mt-2">
                 Whatever stays red is an assumption. That&apos;s fine at this stage: those become the things you test first.
               </p>
+              <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-[var(--line)] pt-4">
+                <p className="min-w-0 flex-1 text-sm">
+                  {ev.length} piece{ev.length === 1 ? "" : "s"} of evidence added so far. Each one is saved as you add it. When you&apos;ve been
+                  through every box, finish the session.
+                </p>
+                <FinishForm id={id} sessionKey={key} label="I've been through every box: finish session" />
+              </div>
             </div>
             <CanvasBoard
               businessId={id}
@@ -188,7 +195,7 @@ export default async function SessionPage({
               addEvidence={addEvidence}
               deleteEvidence={deleteEvidence}
             />
-            <FinishForm id={id} sessionKey={key} />
+            <FinishForm id={id} sessionKey={key} label="I've been through every box: finish session" />
           </div>
         )}
 

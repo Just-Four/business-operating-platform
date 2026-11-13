@@ -2,6 +2,7 @@ import Link from "next/link";
 import NextPart from "@/components/NextPart";
 import { createClient } from "@/lib/supabase/server";
 import Notice from "@/components/Notice";
+import SessionBanner from "@/components/SessionBanner";
 import { savePriority, removePriority, addKeyResult, updateKeyResult, pastePriorities, addTask } from "../actions";
 
 type Priority = {
@@ -103,12 +104,7 @@ export default async function QuarterPage({
   return (
     <div className="max-w-4xl">
       <Notice error={error} saved={saved} />
-      {session && (
-        <p className="mb-4 rounded border border-[var(--line)] bg-white p-3 text-sm">
-          You&apos;re in a planning session.{" "}
-          <Link href={`/b/${id}/s/${session}`} className="font-semibold underline underline-offset-4">Back to the session</Link>
-        </p>
-      )}
+      {session && <SessionBanner businessId={id} sessionKey={session} />}
       <p className="hint">Stage 3: Plan</p>
       <h1 className="text-4xl font-bold leading-none sm:text-5xl">This quarter</h1>
       <p className="mt-3 max-w-2xl text-[var(--muted)]">

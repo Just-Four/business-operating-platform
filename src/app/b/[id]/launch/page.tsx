@@ -10,6 +10,7 @@ import {
   updateMilestone,
 } from "../actions";
 import Notice from "@/components/Notice";
+import SessionBanner from "@/components/SessionBanner";
 import { guidanceFor } from "@/lib/guidance";
 
 const statusColour: Record<string, string> = {
@@ -42,6 +43,7 @@ export default async function LaunchPage({
   return (
     <div>
       <Notice error={error} saved={saved} />
+      {session && <SessionBanner businessId={id} sessionKey={session} />}
       {session && (
         <p className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded border border-[var(--wait)] bg-[var(--wait-tint)] p-3 text-sm">
           <span>You&apos;re working through this as part of your planning programme.</span>

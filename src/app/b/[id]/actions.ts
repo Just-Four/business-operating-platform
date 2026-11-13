@@ -46,6 +46,18 @@ async function completeSessionInternal(supabase: SupabaseClient, businessId: str
     },
     { onConflict: "business_id,key" }
   );
+  // The evidence session has no form of its own to save, only a separate finish button, so it is easy to
+  // leave open. If a later session is finished and evidence has been added, it was done: close it too.
+  const EVIDENCE_SEQ = SESSIONS.find((x) => x.key === "evidence")?.seq ?? 0;
+  const evidenceOpen = (rows ?? []).some((r) => r.key === "evidence" && !r.completed_at);
+  if (key !== "evidence" && seq > EVIDENCE_SEQ && evidenceOpen) {
+    const { count } = await supabase.from("evidence").select("id", { count: "exact", head: true }).eq("business_id", businessId);
+    if ((count ?? 0) > 0) {
+      const now = new Date().toISOString();
+      await supabase.from("programme_sessions").update({ completed_at: now, completed_by: user?.id ?? null }).eq("business_id", businessId).eq("key", "evidence");
+      for (const r of rows ?? []) if (r.key === "evidence") r.completed_at = now;
+    }
+  }
   // Ahead of schedule: pull the remaining sessions forward by the days gained,
   // but only when every earlier session is done (finishing out of order doesn't count).
   const earlierOpen = (rows ?? []).some((r) => r.seq < seq && !r.completed_at);

@@ -3,6 +3,7 @@ import NextPart from "@/components/NextPart";
 import { createClient } from "@/lib/supabase/server";
 import { saveDirection } from "../actions";
 import Notice from "@/components/Notice";
+import SessionBanner from "@/components/SessionBanner";
 import { guidanceFor } from "@/lib/guidance";
 
 export default async function DirectionPage({
@@ -25,6 +26,7 @@ export default async function DirectionPage({
   return (
     <div className="max-w-3xl">
       <Notice error={error} saved={saved} />
+      {session && <SessionBanner businessId={id} sessionKey={session} />}
       {session && (
         <p className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded border border-[var(--wait)] bg-[var(--wait-tint)] p-3 text-sm">
           <span>You&apos;re working through this as part of your planning programme.</span>
